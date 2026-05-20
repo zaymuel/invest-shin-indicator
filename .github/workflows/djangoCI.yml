@@ -1,0 +1,53 @@
+name: Django CI
+
+on:
+  push:
+    branches: [ master, dev ]
+  pull_request:
+    branches: [ master, dev ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.13.11'] # Django 5.2 requires Python 3.10+
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip' # Automatically caches pip dependencies for faster runs
+        
+    - name: Install OS dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential default-libmysqlclient-dev pkg-config
+        
+    - name: Install Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install django
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        
+    # Optional: uncomment if you add flake8 or ruff for linting
+    # - name: Lint with flake8
+    #   run: |
+    #     pip install flake8
+    #     flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+    #     flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        
+    - name: Check migrations
+      env:
+        DJANGO_SETTINGS_MODULE: invest.local_settings
+      run: |
+        python manage.py makemigrations --check --dry-run
+        
+    - name: Run Tests
+      env:
+        DJANGO_SETTINGS_MODULE: invest.local_settings
+      run: |
+        python manage.py test
