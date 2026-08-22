@@ -1,9 +1,10 @@
-import math
+﻿import math
 from decimal import Decimal, InvalidOperation
+
+from django.db import transaction
 from django.utils import timezone
 
-from ..models import CompositeIndicator, Metric, MetricHistory
-from django.db import transaction
+from ..models import CompositeIndicator, CompositeIndicatorValue, Metric, MetricHistory
 
 
 def safe_decimal(value):
@@ -28,17 +29,6 @@ def _get_operand(formula, latest_values: dict, operand_name: str, default_key: s
 
 
 def _evaluate_shin_v1(formula: CompositeIndicator, latest_values: dict):
-    """
-    LOG10(
-      MAX(0.001,
-        (1 + (DY/4))
-        * MAX(0.01, MargemLiquida)
-        * MAX(0.01, CAGRReceitas)
-        * MAX(0.01, CAGRlucros)
-        / (IF(P_L<=0,1000,P_L) * IF(P_VP<=0,1000,P_VP))
-      )
-    )
-    """
     dy = _get_operand(formula, latest_values, "dy_key", "dy")
     margem_liquida = _max_decimal(
         "0.01",
@@ -83,48 +73,53 @@ def evaluate_formula(formula: CompositeIndicator, latest_values: dict):
     return None
 
 
-def _collect_latest_raw_metric_values(asset=None):
-    raw_metrics = Metric.objects.filter(kind="raw", is_active=True)
-    if asset is not None:
-        raw_metrics = raw_metrics.filter(asset=asset)
+def _collect_latest_raw_metric_values(asset):
+    raw_metrics = Metric.objects.filter(
+        kind="raw", is_active=True, asset=asset)
     latest_values = {}
-    for m in raw_metrics:
-        mh = MetricHistory.objects.filter(
-            metric=m).order_by("-timestamp").first()
-        if mh:
-            latest_values[m.key] = mh.value
+    for metric in raw_metrics:
+        latest_history = MetricHistory.objects.filter(
+            metric=metric).order_by("-timestamp").first()
+        if latest_history:
+            latest_values[metric.key] = latest_history.value
     return latest_values
 
 
 def compute_derived_metrics(derived_keys=None, persist=False, source_label="calculated", asset=None):
-    latest_values = _collect_latest_raw_metric_values(asset=asset)
-    derived_qs = Metric.objects.filter(
-        kind="derived", is_active=True).select_related("composite")
-    if asset is not None:
-        derived_qs = derived_qs.filter(asset=asset)
-    if derived_keys:
-        derived_qs = derived_qs.filter(key__in=list(derived_keys))
+    # Kept function name for compatibility with existing callers.
+    if asset is None:
+        return {}
 
-    results = {}
+    latest_values = _collect_latest_raw_metric_values(asset=asset)
+    indicators = CompositeIndicator.objects.exclude(
+        formula_code__isnull=True).exclude(formula_code="")
+
+    if derived_keys:
+        # If a caller passes metric keys, allow only SHIN-related calls for compatibility.
+        allowed = set(derived_keys)
+        if "shin_indicator" not in allowed:
+            return {}
+
     now = timezone.now()
     create_items = []
-    for dm in derived_qs:
-        composite = dm.composite
-        if composite is None or not composite.formula_code:
-            results[dm.key] = None
-            continue
-        value = evaluate_formula(composite, latest_values)
-        results[dm.key] = value
+    results = {}
+
+    for indicator in indicators:
+        value = evaluate_formula(indicator, latest_values)
+        results[indicator.name] = value
         if persist and value is not None:
             create_items.append(
-                MetricHistory(
-                    metric=dm,
+                CompositeIndicatorValue(
+                    composite=indicator,
+                    asset=asset,
                     value=value,
                     timestamp=now,
                     source=source_label,
                 )
             )
+
     if create_items:
         with transaction.atomic():
-            MetricHistory.objects.bulk_create(create_items)
+            CompositeIndicatorValue.objects.bulk_create(create_items)
+
     return results

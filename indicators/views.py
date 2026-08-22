@@ -1,4 +1,4 @@
-from django.contrib import messages
+﻿from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import OuterRef, Subquery
 from django.shortcuts import get_object_or_404, redirect
@@ -6,8 +6,14 @@ from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import DetailView, ListView
 
-from .models import Asset, CompositeIndicator, Metric, MetricHistory, WatchlistEntry
-from .services.calculations import compute_derived_metrics
+from .models import (
+    Asset,
+    CompositeIndicator,
+    CompositeIndicatorValue,
+    Metric,
+    MetricHistory,
+    WatchlistEntry,
+)
 
 
 class CompositeIndicatorListView(ListView):
@@ -30,8 +36,7 @@ class CompositeIndicatorDetailView(DetailView):
             Metric.objects.filter(composite=self.object, is_active=True)
             .annotate(
                 latest_value=Subquery(latest_history.values("value")[:1]),
-                latest_timestamp=Subquery(
-                    latest_history.values("timestamp")[:1]),
+                latest_timestamp=Subquery(latest_history.values("timestamp")[:1]),
             )
             .order_by("name")
         )
@@ -41,15 +46,15 @@ class CompositeIndicatorDetailView(DetailView):
             .order_by("-timestamp")[:50]
         )
 
-        available_metric_keys = [metric.key for metric in metrics]
-        derived_metrics = compute_derived_metrics(
-            derived_keys=available_metric_keys,
-            persist=False,
+        latest_indicator_values = (
+            CompositeIndicatorValue.objects.filter(composite=self.object)
+            .select_related("asset")
+            .order_by("-timestamp")[:50]
         )
 
         context["metrics"] = metrics
         context["recent_history"] = recent_history
-        context["derived_metrics"] = derived_metrics
+        context["latest_indicator_values"] = latest_indicator_values
         return context
 
 
@@ -87,11 +92,9 @@ class WatchlistAddView(LoginRequiredMixin, View):
             user=request.user, asset=asset
         )
         if created:
-            messages.success(
-                request, f"{asset.symbol} added to your watchlist.")
+            messages.success(request, f"{asset.symbol} added to your watchlist.")
         else:
-            messages.info(
-                request, f"{asset.symbol} is already in your watchlist.")
+            messages.info(request, f"{asset.symbol} is already in your watchlist.")
         return redirect("watchlist")
 
 
@@ -99,9 +102,9 @@ class WatchlistRemoveView(LoginRequiredMixin, View):
     login_url = reverse_lazy("login")
 
     def post(self, request, *args, **kwargs):
-        entry = get_object_or_404(
-            WatchlistEntry, id=kwargs.get("pk"), user=request.user)
+        entry = get_object_or_404(WatchlistEntry, id=kwargs.get("pk"), user=request.user)
         asset_symbol = entry.asset.symbol
         entry.delete()
         messages.info(request, f"{asset_symbol} removed from your watchlist.")
         return redirect("watchlist")
+

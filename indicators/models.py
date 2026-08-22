@@ -30,8 +30,10 @@ class CompositeIndicator(models.Model):
         verbose_name="formula code",
     )
     expression = models.TextField(blank=True, verbose_name="expression")
-    operands = models.JSONField(default=dict, blank=True, verbose_name="operands")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="created at")
+    operands = models.JSONField(
+        default=dict, blank=True, verbose_name="operands")
+    created_at = models.DateTimeField(
+        auto_now_add=True, verbose_name="created at")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="updated at")
 
     class Meta:
@@ -56,6 +58,39 @@ class CompositeIndicator(models.Model):
         return composite
 
 
+class CompositeIndicatorValue(models.Model):
+    composite = models.ForeignKey(
+        CompositeIndicator,
+        related_name="values",
+        on_delete=models.CASCADE,
+        verbose_name="composite indicator",
+    )
+    asset = models.ForeignKey(
+        "Asset",
+        related_name="indicator_values",
+        on_delete=models.CASCADE,
+        verbose_name="asset",
+    )
+    value = models.DecimalField(
+        max_digits=20, decimal_places=6, verbose_name="value")
+    timestamp = models.DateTimeField(
+        default=timezone.now, db_index=True, verbose_name="timestamp")
+    source = models.CharField(
+        max_length=255, blank=True, verbose_name="source")
+
+    class Meta:
+        verbose_name = "Composite indicator value"
+        verbose_name_plural = "Composite indicator values"
+        ordering = ["-timestamp"]
+        indexes = [
+            models.Index(fields=["composite", "asset",
+                         "-timestamp"], name="cmp_asset_ts_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.composite.name} - {self.asset.symbol} @ {self.timestamp:%Y-%m-%d %H:%M:%S}"
+
+
 class Metric(models.Model):
     KIND_RAW = "raw"
     KIND_DERIVED = "derived"
@@ -73,7 +108,6 @@ class Metric(models.Model):
     METRIC_RECEITAS_CAGR5 = "receitas_cagr5"
     METRIC_LUCROS_CAGR3 = "lucros_cagr3"
     METRIC_LUCROS_CAGR5 = "lucros_cagr5"
-    METRIC_SHIN_INDICATOR = "shin_indicator"
 
     METRIC_DEFINITIONS = {
         METRIC_P_L: {"label": "P/L", "unit": "", "kind": KIND_RAW},
@@ -104,11 +138,6 @@ class Metric(models.Model):
             "unit": "%",
             "kind": KIND_RAW,
         },
-        METRIC_SHIN_INDICATOR: {
-            "label": "SHIN Indicator",
-            "unit": "log10",
-            "kind": KIND_DERIVED,
-        },
     }
 
     METRIC_NAME_CHOICES = [
@@ -138,10 +167,13 @@ class Metric(models.Model):
         verbose_name="metric name",
     )
     key = models.SlugField(max_length=60, verbose_name="key", editable=False)
-    unit = models.CharField(max_length=40, blank=True, verbose_name="unit", editable=False)
-    kind = models.CharField(max_length=20, choices=KIND_CHOICES, default=KIND_RAW, verbose_name="kind")
+    unit = models.CharField(max_length=40, blank=True,
+                            verbose_name="unit", editable=False)
+    kind = models.CharField(
+        max_length=20, choices=KIND_CHOICES, default=KIND_RAW, verbose_name="kind")
     is_active = models.BooleanField(default=True, verbose_name="active")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="created at")
+    created_at = models.DateTimeField(
+        auto_now_add=True, verbose_name="created at")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="updated at")
 
     class Meta:
@@ -165,9 +197,6 @@ class Metric(models.Model):
         self.unit = definition["unit"]
         self.kind = definition["kind"]
 
-        if self.kind == self.KIND_DERIVED and not self.composite:
-            self.composite = CompositeIndicator.get_or_create_shin_definition()
-
         super().save(*args, **kwargs)
 
 
@@ -178,11 +207,13 @@ class MetricHistory(models.Model):
         on_delete=models.CASCADE,
         verbose_name="metric",
     )
-    value = models.DecimalField(max_digits=20, decimal_places=6, verbose_name="value")
+    value = models.DecimalField(
+        max_digits=20, decimal_places=6, verbose_name="value")
     timestamp = models.DateTimeField(
         default=timezone.now, db_index=True, verbose_name="timestamp"
     )
-    source = models.CharField(max_length=255, blank=True, verbose_name="source")
+    source = models.CharField(
+        max_length=255, blank=True, verbose_name="source")
 
     class Meta:
         verbose_name = "Metric history"
@@ -206,7 +237,8 @@ class Asset(models.Model):
         (TYPE_ACAO, "Ação"),
     ]
 
-    symbol = models.CharField(max_length=20, unique=True, verbose_name="symbol")
+    symbol = models.CharField(
+        max_length=20, unique=True, verbose_name="symbol")
     name = models.CharField(max_length=120, blank=True, verbose_name="name")
     asset_type = models.CharField(
         max_length=20,
@@ -231,31 +263,21 @@ class Asset(models.Model):
             self.ensure_default_metrics()
 
     def ensure_default_metrics(self):
-        composite = CompositeIndicator.get_or_create_shin_definition()
+        CompositeIndicator.get_or_create_shin_definition()
         with transaction.atomic():
-            for metric_name, metric_definition in Metric.METRIC_DEFINITIONS.items():
+            for metric_name in Metric.METRIC_DEFINITIONS.keys():
                 defaults = {
                     "name": metric_name,
                     "is_active": True,
                 }
-                if metric_definition["kind"] == Metric.KIND_DERIVED:
-                    defaults["composite"] = composite
-
                 metric, created = Metric.objects.get_or_create(
                     asset=self,
                     key=metric_name,
                     defaults=defaults,
                 )
-                if not created:
-                    updates = []
-                    if metric.name != metric_name:
-                        metric.name = metric_name
-                        updates.append("name")
-                    if metric_definition["kind"] == Metric.KIND_DERIVED and metric.composite_id != composite.id:
-                        metric.composite = composite
-                        updates.append("composite")
-                    if updates:
-                        metric.save(update_fields=updates)
+                if not created and metric.name != metric_name:
+                    metric.name = metric_name
+                    metric.save(update_fields=["name"])
 
 
 class WatchlistEntry(models.Model):
