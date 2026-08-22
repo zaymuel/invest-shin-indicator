@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Assets | Shin Indicator{% endblock %}
+
+{% block content %}
+  <h1>Available Assets</h1>
+  {% if assets %}
+    <table>
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Name</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for asset in assets %}
+          <tr>
+            <td>{{ asset.symbol }}</td>
+            <td>{{ asset.name|default:"N/A" }}</td>
+            <td>
+              <form method="post" action="{% url 'watchlist-add' %}">
+                {% csrf_token %}
+                <input type="hidden" name="asset_id" value="{{ asset.id }}">
+                <button type="submit">Add to watchlist</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No assets are available yet.</p>
+  {% endif %}
+{% endblock %}

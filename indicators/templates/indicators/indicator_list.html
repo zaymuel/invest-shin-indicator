@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Indicators | Shin Indicator{% endblock %}
+
+{% block content %}
+  <h1>Composite Indicators</h1>
+  {% if indicators %}
+    <ul>
+      {% for indicator in indicators %}
+        <li>
+          <a href="{% url 'indicator-detail' indicator.pk %}">{{ indicator.name }}</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No indicators are available yet.</p>
+  {% endif %}
+{% endblock %}

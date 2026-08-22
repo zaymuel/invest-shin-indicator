@@ -1,0 +1,143 @@
+from django.conf import settings
+from django.db import models
+from django.utils import timezone
+
+
+class CompositeIndicator(models.Model):
+    name = models.CharField(max_length=120, unique=True, verbose_name="name")
+    description = models.TextField(blank=True, verbose_name="description")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="created at")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="updated at")
+
+    class Meta:
+        verbose_name = "Composite indicator"
+        verbose_name_plural = "Composite indicators"
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class Metric(models.Model):
+    composite = models.ForeignKey(
+        CompositeIndicator,
+        related_name="metrics",
+        on_delete=models.CASCADE,
+        verbose_name="composite indicator",
+    )
+    name = models.CharField(max_length=120, verbose_name="name")
+    key = models.SlugField(max_length=60, verbose_name="key")
+    unit = models.CharField(max_length=40, blank=True, verbose_name="unit")
+    is_active = models.BooleanField(default=True, verbose_name="active")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="created at")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="updated at")
+
+    class Meta:
+        verbose_name = "Metric"
+        verbose_name_plural = "Metrics"
+        unique_together = ("composite", "key")
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+    def latest_history(self):
+        return self.history.order_by("-timestamp").first()
+
+
+class MetricHistory(models.Model):
+    metric = models.ForeignKey(
+        Metric,
+        related_name="history",
+        on_delete=models.CASCADE,
+        verbose_name="metric",
+    )
+    value = models.DecimalField(max_digits=20, decimal_places=6, verbose_name="value")
+    timestamp = models.DateTimeField(
+        default=timezone.now, db_index=True, verbose_name="timestamp"
+    )
+    source = models.CharField(max_length=255, blank=True, verbose_name="source")
+
+    class Meta:
+        verbose_name = "Metric history"
+        verbose_name_plural = "Metric history"
+        ordering = ["-timestamp"]
+
+    def __str__(self) -> str:
+        return f"{self.metric.name} @ {self.timestamp:%Y-%m-%d %H:%M:%S}"
+
+
+class AssetType(models.Model):
+    TYPE_REIT = "reit"
+    TYPE_FII = "fii"
+    TYPE_STOCK = "stock"
+    TYPE_ACAO = "acao"
+
+    ASSET_TYPE_CHOICES = [
+        (TYPE_REIT, "REIT"),
+        (TYPE_FII, "FII"),
+        (TYPE_STOCK, "Stock"),
+        (TYPE_ACAO, "Ação"),
+    ]
+
+    code = models.CharField(
+        max_length=20,
+        unique=True,
+        choices=ASSET_TYPE_CHOICES,
+        verbose_name="asset type code",
+    )
+    name = models.CharField(max_length=60, verbose_name="name")
+    description = models.TextField(blank=True, verbose_name="description")
+
+    class Meta:
+        verbose_name = "Asset type"
+        verbose_name_plural = "Asset types"
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name or self.get_code_display()
+
+
+class Asset(models.Model):
+    symbol = models.CharField(max_length=20, unique=True, verbose_name="symbol")
+    name = models.CharField(max_length=120, blank=True, verbose_name="name")
+    asset_type = models.ForeignKey(
+        AssetType,
+        related_name="assets",
+        on_delete=models.PROTECT,
+        verbose_name="asset type",
+    )
+    is_active = models.BooleanField(default=True, verbose_name="active")
+
+    class Meta:
+        verbose_name = "Asset"
+        verbose_name_plural = "Assets"
+        ordering = ["symbol"]
+
+    def __str__(self) -> str:
+        return self.symbol
+
+
+class WatchlistEntry(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="watchlist_entries",
+        on_delete=models.CASCADE,
+        verbose_name="user",
+    )
+    asset = models.ForeignKey(
+        Asset,
+        related_name="watchlisted_by",
+        on_delete=models.CASCADE,
+        verbose_name="asset",
+    )
+    added_at = models.DateTimeField(auto_now_add=True, verbose_name="added at")
+
+    class Meta:
+        verbose_name = "Watchlist entry"
+        verbose_name_plural = "Watchlist entries"
+        unique_together = ("user", "asset")
+        ordering = ["-added_at"]
+
+    def __str__(self) -> str:
+        return f"{self.user} - {self.asset}"

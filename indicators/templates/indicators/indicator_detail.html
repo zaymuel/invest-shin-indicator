@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}{{ indicator.name }} | Shin Indicator{% endblock %}
+
+{% block content %}
+  <h1>{{ indicator.name }}</h1>
+  {% if indicator.description %}
+    <p>{{ indicator.description }}</p>
+  {% endif %}
+
+  <h2>Current Metrics</h2>
+  {% if metrics %}
+    <table>
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Latest Value</th>
+          <th>Timestamp</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for metric in metrics %}
+          <tr>
+            <td>{{ metric.name }}</td>
+            <td>
+              {% if metric.latest_value is not None %}
+                {{ metric.latest_value }} {{ metric.unit }}
+              {% else %}
+                N/A
+              {% endif %}
+            </td>
+            <td>
+              {% if metric.latest_timestamp %}
+                {{ metric.latest_timestamp }}
+              {% else %}
+                N/A
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No metrics have been configured yet.</p>
+  {% endif %}
+
+  <h2>Recent History</h2>
+  {% if recent_history %}
+    <table>
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Value</th>
+          <th>Timestamp</th>
+          <th>Source</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for record in recent_history %}
+          <tr>
+            <td>{{ record.metric.name }}</td>
+            <td>{{ record.value }} {{ record.metric.unit }}</td>
+            <td>{{ record.timestamp }}</td>
+            <td>{{ record.source|default:"N/A" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No historical records available yet.</p>
+  {% endif %}
+{% endblock %}

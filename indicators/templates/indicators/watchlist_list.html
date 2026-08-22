@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Watchlist | Shin Indicator{% endblock %}
+
+{% block content %}
+  <h1>Your Watchlist</h1>
+  {% if entries %}
+    <table>
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Name</th>
+          <th>Added</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in entries %}
+          <tr>
+            <td>{{ entry.asset.symbol }}</td>
+            <td>{{ entry.asset.name|default:"N/A" }}</td>
+            <td>{{ entry.added_at }}</td>
+            <td>
+              <form method="post" action="{% url 'watchlist-remove' entry.pk %}">
+                {% csrf_token %}
+                <button type="submit">Remove</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>Your watchlist is empty. Add assets from the asset list.</p>
+  {% endif %}
+{% endblock %}
