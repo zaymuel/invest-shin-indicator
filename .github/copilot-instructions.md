@@ -12,6 +12,8 @@ This is a Django 5.2 application for scraping and tracking investing indicators.
   - Regular users CANNOT add, edit, or delete the base indicator data.
   - Only admins can manage (create/update/delete) core indicator data via the Django Admin panel.
 - **Data Model Focus:** Initially, the app centers around a single composite indicator made up of various financial metrics.
+  - **Historical Tracking:** For any metric composing the indicator, models must record historical values (time-series data) to track evolution over time.
+  - **Timestamps:** Every recorded metric value must include a timestamp indicating exactly when it was scraped.
 
 # Code Conventions & Rules
 - **Django Views:** Prefer Class-Based Views (CBV) over Function-Based Views (FBV). Let generic CBVs do the heavy lifting for list and detail views.
