@@ -13,7 +13,7 @@ from .services.calculations import compute_derived_metrics
 
 @admin.register(CompositeIndicator)
 class CompositeIndicatorAdmin(admin.ModelAdmin):
-    list_display = ("name", "updated_at")
+    list_display = ("name", "formula_code", "updated_at")
     search_fields = ("name",)
 
 
@@ -25,28 +25,34 @@ class MetricHistoryInline(admin.TabularInline):
 
 @admin.register(Metric)
 class MetricAdmin(admin.ModelAdmin):
-    list_display = ("name", "composite", "key", "kind", "is_active", "updated_at")
-    list_filter = ("is_active", "composite", "kind")
-    search_fields = ("name", "key")
+    list_display = ("asset", "name", "key", "unit", "kind", "is_active", "updated_at")
+    list_filter = ("is_active", "kind", "asset")
+    search_fields = ("asset__symbol", "name", "key")
+    readonly_fields = ("key", "unit", "kind")
     inlines = [MetricHistoryInline]
     actions = ["recalculate_selected_derived"]
 
     def recalculate_selected_derived(self, request, queryset):
-        # if user selected specific derived metrics, compute only those; otherwise compute all
-        derived_qs = queryset.filter(kind="derived")
-        if not derived_qs.exists():
-            # nothing selected: calculate all derived
-            computed = compute_derived_metrics(persist=True)
-        else:
-            keys = list(derived_qs.values_list("key", flat=True))
-            computed = compute_derived_metrics(derived_keys=keys, persist=True)
+        derived_qs = queryset.filter(kind="derived", asset__isnull=False)
+        computed_count = 0
+        for asset in Asset.objects.filter(id__in=derived_qs.values_list("asset_id", flat=True).distinct()):
+            computed = compute_derived_metrics(
+                derived_keys=list(derived_qs.filter(asset=asset).values_list("key", flat=True)),
+                persist=True,
+                asset=asset,
+            )
+            computed_count += sum(1 for value in computed.values() if value is not None)
 
-        n = sum(1 for v in computed.values() if v is not None)
-        self.message_user(request, ngettext(
-            '%d derived metric recalculated.',
-            '%d derived metrics recalculated.',
-            n,
-        ) % n, messages.SUCCESS)
+        self.message_user(
+            request,
+            ngettext(
+                "%d derived metric recalculated.",
+                "%d derived metrics recalculated.",
+                computed_count,
+            )
+            % computed_count,
+            messages.SUCCESS,
+        )
 
     recalculate_selected_derived.short_description = "Recalculate selected derived metrics"
 
