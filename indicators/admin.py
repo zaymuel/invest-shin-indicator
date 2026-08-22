@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Asset, AssetType, CompositeIndicator, Metric, MetricHistory, WatchlistEntry
+from .models import Asset, CompositeIndicator, Metric, MetricHistory, WatchlistEntry
 
 
 @admin.register(CompositeIndicator)
@@ -28,12 +28,6 @@ class MetricHistoryAdmin(admin.ModelAdmin):
     list_display = ("metric", "value", "timestamp", "source")
     list_filter = ("metric",)
     search_fields = ("metric__name", "source")
-
-
-@admin.register(AssetType)
-class AssetTypeAdmin(admin.ModelAdmin):
-    list_display = ("code", "name")
-    search_fields = ("code", "name")
 
 
 @admin.register(Asset)

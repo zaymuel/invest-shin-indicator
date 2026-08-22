@@ -67,7 +67,7 @@ class MetricHistory(models.Model):
         return f"{self.metric.name} @ {self.timestamp:%Y-%m-%d %H:%M:%S}"
 
 
-class AssetType(models.Model):
+class Asset(models.Model):
     TYPE_REIT = "reit"
     TYPE_FII = "fii"
     TYPE_STOCK = "stock"
@@ -80,31 +80,12 @@ class AssetType(models.Model):
         (TYPE_ACAO, "Ação"),
     ]
 
-    code = models.CharField(
-        max_length=20,
-        unique=True,
-        choices=ASSET_TYPE_CHOICES,
-        verbose_name="asset type code",
-    )
-    name = models.CharField(max_length=60, verbose_name="name")
-    description = models.TextField(blank=True, verbose_name="description")
-
-    class Meta:
-        verbose_name = "Asset type"
-        verbose_name_plural = "Asset types"
-        ordering = ["name"]
-
-    def __str__(self) -> str:
-        return self.name or self.get_code_display()
-
-
-class Asset(models.Model):
     symbol = models.CharField(max_length=20, unique=True, verbose_name="symbol")
     name = models.CharField(max_length=120, blank=True, verbose_name="name")
-    asset_type = models.ForeignKey(
-        AssetType,
-        related_name="assets",
-        on_delete=models.PROTECT,
+    asset_type = models.CharField(
+        max_length=20,
+        choices=ASSET_TYPE_CHOICES,
+        default=TYPE_STOCK,
         verbose_name="asset type",
     )
     is_active = models.BooleanField(default=True, verbose_name="active")
