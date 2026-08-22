@@ -2,7 +2,7 @@ import math
 from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 
-from ..models import Metric, MetricFormula, MetricHistory
+from ..models import CompositeIndicator, Metric, MetricHistory
 from django.db import transaction
 
 
@@ -22,12 +22,12 @@ def _max_decimal(threshold: str, value):
     return max(Decimal(threshold), decimal_value)
 
 
-def _get_operand(formula: MetricFormula, latest_values: dict, operand_name: str, default_key: str):
+def _get_operand(formula, latest_values: dict, operand_name: str, default_key: str):
     operand_key = formula.operands.get(operand_name, default_key)
     return safe_decimal(latest_values.get(operand_key))
 
 
-def _evaluate_shin_v1(formula: MetricFormula, latest_values: dict):
+def _evaluate_shin_v1(formula: CompositeIndicator, latest_values: dict):
     """
     LOG10(
       MAX(0.001,
@@ -77,8 +77,8 @@ def _evaluate_shin_v1(formula: MetricFormula, latest_values: dict):
     return Decimal(str(math.log10(float(base))))
 
 
-def evaluate_formula(formula: MetricFormula, latest_values: dict):
-    if formula.formula_code == MetricFormula.FORMULA_SHIN_V1:
+def evaluate_formula(formula: CompositeIndicator, latest_values: dict):
+    if formula.formula_code == CompositeIndicator.FORMULA_SHIN_V1:
         return _evaluate_shin_v1(formula, latest_values)
     return None
 
@@ -99,7 +99,7 @@ def _collect_latest_raw_metric_values(asset=None):
 def compute_derived_metrics(derived_keys=None, persist=False, source_label="calculated", asset=None):
     latest_values = _collect_latest_raw_metric_values(asset=asset)
     derived_qs = Metric.objects.filter(
-        kind="derived", is_active=True).select_related("formula")
+        kind="derived", is_active=True).select_related("composite")
     if asset is not None:
         derived_qs = derived_qs.filter(asset=asset)
     if derived_keys:
@@ -109,11 +109,11 @@ def compute_derived_metrics(derived_keys=None, persist=False, source_label="calc
     now = timezone.now()
     create_items = []
     for dm in derived_qs:
-        formula = getattr(dm, "formula", None)
-        if not formula or not formula.is_active:
+        composite = dm.composite
+        if composite is None or not composite.formula_code:
             results[dm.key] = None
             continue
-        value = evaluate_formula(formula, latest_values)
+        value = evaluate_formula(composite, latest_values)
         results[dm.key] = value
         if persist and value is not None:
             create_items.append(

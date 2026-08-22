@@ -4,8 +4,23 @@ from django.utils import timezone
 
 
 class CompositeIndicator(models.Model):
+    FORMULA_SHIN_V1 = "shin_v1"
+
+    FORMULA_CHOICES = [
+        (FORMULA_SHIN_V1, "SHIN indicator (v1)"),
+    ]
+
     name = models.CharField(max_length=120, unique=True, verbose_name="name")
     description = models.TextField(blank=True, verbose_name="description")
+    formula_code = models.CharField(
+        max_length=40,
+        choices=FORMULA_CHOICES,
+        blank=True,
+        null=True,
+        verbose_name="formula code",
+    )
+    expression = models.TextField(blank=True, verbose_name="expression")
+    operands = models.JSONField(default=dict, blank=True, verbose_name="operands")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="created at")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="updated at")
 
@@ -62,39 +77,6 @@ class Metric(models.Model):
 
     def latest_history(self):
         return self.history.order_by("-timestamp").first()
-
-
-class MetricFormula(models.Model):
-    FORMULA_SHIN_V1 = "shin_v1"
-
-    FORMULA_CHOICES = [
-        (FORMULA_SHIN_V1, "SHIN indicator (v1)"),
-    ]
-
-    metric = models.OneToOneField(
-        Metric,
-        related_name="formula",
-        on_delete=models.CASCADE,
-        verbose_name="metric",
-    )
-    formula_code = models.CharField(
-        max_length=40,
-        choices=FORMULA_CHOICES,
-        verbose_name="formula code",
-    )
-    expression = models.TextField(verbose_name="expression")
-    operands = models.JSONField(default=dict, blank=True, verbose_name="operands")
-    is_active = models.BooleanField(default=True, verbose_name="active")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="created at")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="updated at")
-
-    class Meta:
-        verbose_name = "Metric formula"
-        verbose_name_plural = "Metric formulas"
-        ordering = ["metric__name"]
-
-    def __str__(self) -> str:
-        return f"{self.metric.key} ({self.formula_code})"
 
 
 class MetricHistory(models.Model):

@@ -5,7 +5,6 @@ from .models import (
     Asset,
     CompositeIndicator,
     Metric,
-    MetricFormula,
     MetricHistory,
     WatchlistEntry,
 )
@@ -24,18 +23,12 @@ class MetricHistoryInline(admin.TabularInline):
     ordering = ("-timestamp",)
 
 
-class MetricFormulaInline(admin.StackedInline):
-    model = MetricFormula
-    extra = 0
-    fk_name = "metric"
-
-
 @admin.register(Metric)
 class MetricAdmin(admin.ModelAdmin):
     list_display = ("name", "composite", "key", "kind", "is_active", "updated_at")
     list_filter = ("is_active", "composite", "kind")
     search_fields = ("name", "key")
-    inlines = [MetricFormulaInline, MetricHistoryInline]
+    inlines = [MetricHistoryInline]
     actions = ["recalculate_selected_derived"]
 
     def recalculate_selected_derived(self, request, queryset):
@@ -56,13 +49,6 @@ class MetricAdmin(admin.ModelAdmin):
         ) % n, messages.SUCCESS)
 
     recalculate_selected_derived.short_description = "Recalculate selected derived metrics"
-
-
-@admin.register(MetricFormula)
-class MetricFormulaAdmin(admin.ModelAdmin):
-    list_display = ("metric", "formula_code", "is_active", "updated_at")
-    list_filter = ("formula_code", "is_active")
-    search_fields = ("metric__name", "metric__key", "formula_code")
 
 
 @admin.register(MetricHistory)
