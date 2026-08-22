@@ -1,4 +1,4 @@
-from django.conf import settings
+﻿from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -19,15 +19,34 @@ class CompositeIndicator(models.Model):
 
 
 class Metric(models.Model):
+    KIND_RAW = "raw"
+    KIND_DERIVED = "derived"
+
+    KIND_CHOICES = [
+        (KIND_RAW, "Raw"),
+        (KIND_DERIVED, "Derived"),
+    ]
+
     composite = models.ForeignKey(
         CompositeIndicator,
         related_name="metrics",
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         verbose_name="composite indicator",
+    )
+    asset = models.ForeignKey(
+        "Asset",
+        related_name="metrics",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name="asset",
     )
     name = models.CharField(max_length=120, verbose_name="name")
     key = models.SlugField(max_length=60, verbose_name="key")
     unit = models.CharField(max_length=40, blank=True, verbose_name="unit")
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES, default=KIND_RAW, verbose_name="kind")
     is_active = models.BooleanField(default=True, verbose_name="active")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="created at")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="updated at")
@@ -35,7 +54,7 @@ class Metric(models.Model):
     class Meta:
         verbose_name = "Metric"
         verbose_name_plural = "Metrics"
-        unique_together = ("composite", "key")
+        unique_together = (("composite", "key"), ("asset", "key"))
         ordering = ["name"]
 
     def __str__(self) -> str:
@@ -43,6 +62,39 @@ class Metric(models.Model):
 
     def latest_history(self):
         return self.history.order_by("-timestamp").first()
+
+
+class MetricFormula(models.Model):
+    FORMULA_SHIN_V1 = "shin_v1"
+
+    FORMULA_CHOICES = [
+        (FORMULA_SHIN_V1, "SHIN indicator (v1)"),
+    ]
+
+    metric = models.OneToOneField(
+        Metric,
+        related_name="formula",
+        on_delete=models.CASCADE,
+        verbose_name="metric",
+    )
+    formula_code = models.CharField(
+        max_length=40,
+        choices=FORMULA_CHOICES,
+        verbose_name="formula code",
+    )
+    expression = models.TextField(verbose_name="expression")
+    operands = models.JSONField(default=dict, blank=True, verbose_name="operands")
+    is_active = models.BooleanField(default=True, verbose_name="active")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="created at")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="updated at")
+
+    class Meta:
+        verbose_name = "Metric formula"
+        verbose_name_plural = "Metric formulas"
+        ordering = ["metric__name"]
+
+    def __str__(self) -> str:
+        return f"{self.metric.key} ({self.formula_code})"
 
 
 class MetricHistory(models.Model):
