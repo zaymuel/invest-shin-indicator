@@ -62,6 +62,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # 'django_cleanup.apps.CleanupConfig', # Add when you install it
+    'users',
+    'indicators',
+    'scraper',
 ]
 
 MIDDLEWARE = [
@@ -79,7 +82,7 @@ ROOT_URLCONF = 'invest.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -91,6 +94,12 @@ TEMPLATES = [
         },
     },
 ]
+
+AUTH_USER_MODEL = 'users.User'
+
+LOGIN_REDIRECT_URL = 'indicator-list'
+LOGOUT_REDIRECT_URL = 'indicator-list'
+LOGIN_URL = 'login'
 
 WSGI_APPLICATION = 'invest.wsgi.application'
 
