@@ -45,12 +45,14 @@ if _secret_key_file:
     with open(_secret_key_file) as f:
         SECRET_KEY = f.read().strip()
 else:
-    SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-default-key-for-dev-only')
+    SECRET_KEY = os.environ.get(
+        'DJANGO_SECRET_KEY', 'django-insecure-default-key-for-dev-only')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '.invest.com').split(',')
+ALLOWED_HOSTS = os.environ.get(
+    'DJANGO_ALLOWED_HOSTS', '.invest.com').split(',')
 
 # Application definition
 
@@ -97,8 +99,8 @@ TEMPLATES = [
 
 AUTH_USER_MODEL = 'users.User'
 
-LOGIN_REDIRECT_URL = 'indicator-list'
-LOGOUT_REDIRECT_URL = 'indicator-list'
+LOGIN_REDIRECT_URL = 'home'
+LOGOUT_REDIRECT_URL = 'home'
 LOGIN_URL = 'login'
 
 WSGI_APPLICATION = 'invest.wsgi.application'

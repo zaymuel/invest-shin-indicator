@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block title %}{{ asset.symbol }} — Metrics &amp; Indicator | Invest Shin{% endblock %}
+
+{% block content %}
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'home' %}">Home</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'asset-list' %}">Assets</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ asset.symbol }}</li>
+    </ol>
+  </nav>
+
+  <!-- Asset Header -->
+  <div class="card mb-4 shadow-sm border-secondary-subtle">
+    <div class="card-body p-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div>
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <h1 class="display-6 fw-bold mb-0">{{ asset.symbol }}</h1>
+            <span class="badge bg-primary fs-6">{{ asset.get_asset_type_display }}</span>
+            {% if asset.is_active %}
+              <span class="badge bg-success-subtle text-success-emphasis">Active</span>
+            {% else %}
+              <span class="badge bg-secondary">Inactive</span>
+            {% endif %}
+          </div>
+          <p class="text-muted fs-5 mb-0">{{ asset.name|default:"Name not specified" }}</p>
+        </div>
+
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          {% if user.is_authenticated %}
+            {% if is_watched %}
+              <form method="post" action="{% url 'watchlist-remove' watchlist_entry.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{% url 'asset-detail' asset.pk %}">
+                <button type="submit" class="btn btn-warning">
+                  <i class="bi bi-star-fill me-1"></i>Watching (Click to Remove)
+                </button>
+              </form>
+            {% else %}
+              <form method="post" action="{% url 'watchlist-add' %}">
+                {% csrf_token %}
+                <input type="hidden" name="asset_id" value="{{ asset.id }}">
+                <input type="hidden" name="next" value="{% url 'asset-detail' asset.pk %}">
+                <button type="submit" class="btn btn-outline-warning">
+                  <i class="bi bi-star me-1"></i>Add to Watchlist
+                </button>
+              </form>
+            {% endif %}
+          {% endif %}
+
+          {% if first_indicator %}
+            <a href="{% url 'indicator-detail' first_indicator.pk %}" class="btn btn-outline-info">
+              <i class="bi bi-table me-1"></i>All Indicator Scores
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Indicator Score Banner -->
+  <div class="row g-4 mb-4">
+    <div class="col-lg-4 col-md-6">
+      <div class="card h-100 border-primary bg-primary bg-opacity-10 shadow-sm">
+        <div class="card-body p-4 text-center d-flex flex-column justify-content-center">
+          <span class="text-uppercase fw-semibold text-primary small tracking-wide">Composite SHIN Score</span>
+          <div class="display-4 fw-bold text-primary my-2">
+            {% if latest_snapshot and latest_snapshot.shin_indicator is not None %}
+              {{ latest_snapshot.shin_indicator|floatformat:4 }}
+            {% else %}
+              <span class="text-muted fs-2">N/A</span>
+            {% endif %}
+          </div>
+          <span class="text-muted small">
+            {% if latest_snapshot %}
+              Computed on {{ latest_snapshot.timestamp|date:"Y-m-d H:i" }}
+            {% else %}
+              No snapshot recorded yet
+            {% endif %}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Stats Cards -->
+    <div class="col-lg-8 col-md-6">
+      <div class="row g-3">
+        <div class="col-sm-6 col-md-3">
+          <div class="card p-3 h-100 metric-card">
+            <span class="text-muted small">P/L (Price/Earnings)</span>
+            <div class="fs-4 fw-bold mt-1">
+              {% if latest_snapshot and latest_snapshot.p_l is not None %}{{ latest_snapshot.p_l|floatformat:2 }}{% else %}—{% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6 col-md-3">
+          <div class="card p-3 h-100 metric-card">
+            <span class="text-muted small">P/VP (Price/Book)</span>
+            <div class="fs-4 fw-bold mt-1">
+              {% if latest_snapshot and latest_snapshot.p_vp is not None %}{{ latest_snapshot.p_vp|floatformat:2 }}{% else %}—{% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6 col-md-3">
+          <div class="card p-3 h-100 metric-card">
+            <span class="text-muted small">Dividend Yield</span>
+            <div class="fs-4 fw-bold mt-1 text-success">
+              {% if latest_snapshot and latest_snapshot.dy is not None %}{{ latest_snapshot.dy|floatformat:2 }}%{% else %}—{% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6 col-md-3">
+          <div class="card p-3 h-100 metric-card">
+            <span class="text-muted small">Net Margin</span>
+            <div class="fs-4 fw-bold mt-1">
+              {% if latest_snapshot and latest_snapshot.margem_liquida is not None %}{{ latest_snapshot.margem_liquida|floatformat:2 }}%{% else %}—{% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div class="col-sm-6 col-md-3">
+          <div class="card p-3 h-100 metric-card">
+            <span class="text-muted small">CAGR Receitas 5a</span>
+            <div class="fs-5 fw-bold mt-1">
+              {% if latest_snapshot and latest_snapshot.receitas_cagr5 is not None %}{{ latest_snapshot.receitas_cagr5|floatformat:2 }}%{% else %}—{% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6 col-md-3">
+          <div class="card p-3 h-100 metric-card">
+            <span class="text-muted small">CAGR Lucros 5a</span>
+            <div class="fs-5 fw-bold mt-1">
+              {% if latest_snapshot and latest_snapshot.lucros_cagr5 is not None %}{{ latest_snapshot.lucros_cagr5|floatformat:2 }}%{% else %}—{% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6 col-md-3">
+          <div class="card p-3 h-100 metric-card">
+            <span class="text-muted small">CAGR FFO 3a</span>
+            <div class="fs-5 fw-bold mt-1">
+              {% if latest_snapshot and latest_snapshot.ffo_cagr3 is not None %}{{ latest_snapshot.ffo_cagr3|floatformat:2 }}%{% else %}—{% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-6 col-md-3">
+          <div class="card p-3 h-100 metric-card">
+            <span class="text-muted small">CAGR FFO 5a</span>
+            <div class="fs-5 fw-bold mt-1">
+              {% if latest_snapshot and latest_snapshot.ffo_cagr5 is not None %}{{ latest_snapshot.ffo_cagr5|floatformat:2 }}%{% else %}—{% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Latest Snapshot All Metrics Table -->
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-dark-subtle d-flex justify-content-between align-items-center py-3">
+      <h5 class="mb-0 fw-semibold">
+        <i class="bi bi-list-check me-2"></i>Current Metrics Breakdown
+      </h5>
+      {% if latest_snapshot %}
+        <span class="badge bg-secondary-subtle text-secondary-emphasis">
+          Source: {{ latest_snapshot.source|default:"web" }} &bull; {{ latest_snapshot.timestamp|date:"Y-m-d H:i:s" }}
+        </span>
+      {% endif %}
+    </div>
+    <div class="card-body p-0">
+      {% if latest_metrics %}
+        <div class="table-responsive">
+          <table class="table table-hover table-striped mb-0 align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th style="width: 300px;">Metric Name</th>
+                <th style="width: 150px;">Key</th>
+                <th class="text-end" style="width: 200px;">Scraped Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in latest_metrics %}
+                <tr>
+                  <td class="fw-medium">{{ item.label }}</td>
+                  <td><code>{{ item.field }}</code></td>
+                  <td class="text-end fw-semibold text-info">{{ item.value }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="p-4 text-center text-muted">
+          <i class="bi bi-inbox fs-3 d-block mb-2"></i>
+          No metrics have been recorded for this asset yet. Run the scraper or import data to populate values.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Historical Snapshots Table -->
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-dark-subtle d-flex justify-content-between align-items-center py-3">
+      <h5 class="mb-0 fw-semibold">
+        <i class="bi bi-clock-history me-2"></i>Scrape History (Time-Series)
+      </h5>
+      <span class="text-muted small">Showing up to 50 recent records</span>
+    </div>
+    <div class="card-body p-0">
+      {% if history %}
+        <div class="table-responsive">
+          <table class="table table-hover table-striped mb-0 table-sm align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th>Timestamp</th>
+                <th>Date</th>
+                <th class="text-end">P/L</th>
+                <th class="text-end">P/VP</th>
+                <th class="text-end">DY (%)</th>
+                <th class="text-end">Marg. Líq (%)</th>
+                <th class="text-end">CAGR Rec 5a</th>
+                <th class="text-end">CAGR Luc 5a</th>
+                <th class="text-end">CAGR FFO 5a</th>
+                <th class="text-center">SHIN Score</th>
+                <th>Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for snap in history %}
+                <tr>
+                  <td class="small">{{ snap.timestamp|date:"Y-m-d H:i" }}</td>
+                  <td class="small text-muted">{{ snap.date }}</td>
+                  <td class="text-end">{% if snap.p_l is not None %}{{ snap.p_l|floatformat:2 }}{% else %}—{% endif %}</td>
+                  <td class="text-end">{% if snap.p_vp is not None %}{{ snap.p_vp|floatformat:2 }}{% else %}—{% endif %}</td>
+                  <td class="text-end">{% if snap.dy is not None %}{{ snap.dy|floatformat:2 }}%{% else %}—{% endif %}</td>
+                  <td class="text-end">{% if snap.margem_liquida is not None %}{{ snap.margem_liquida|floatformat:2 }}%{% else %}—{% endif %}</td>
+                  <td class="text-end">{% if snap.receitas_cagr5 is not None %}{{ snap.receitas_cagr5|floatformat:2 }}%{% else %}—{% endif %}</td>
+                  <td class="text-end">{% if snap.lucros_cagr5 is not None %}{{ snap.lucros_cagr5|floatformat:2 }}%{% else %}—{% endif %}</td>
+                  <td class="text-end">{% if snap.ffo_cagr5 is not None %}{{ snap.ffo_cagr5|floatformat:2 }}%{% else %}—{% endif %}</td>
+                  <td class="text-center">
+                    {% if snap.shin_indicator is not None %}
+                      <span class="badge bg-primary-subtle text-primary-emphasis fw-semibold">
+                        {{ snap.shin_indicator|floatformat:4 }}
+                      </span>
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td class="small text-muted">{{ snap.source|default:"—" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="p-4 text-center text-muted">
+          No historical records found for this asset.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

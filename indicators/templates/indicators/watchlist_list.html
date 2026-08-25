@@ -1,36 +1,89 @@
 {% extends "base.html" %}
 
-{% block title %}Watchlist | Shin Indicator{% endblock %}
+{% block title %}My Watchlist | Invest Shin{% endblock %}
 
 {% block content %}
-  <h1>Your Watchlist</h1>
-  {% if entries %}
-    <table>
-      <thead>
-        <tr>
-          <th>Symbol</th>
-          <th>Name</th>
-          <th>Added</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for entry in entries %}
-          <tr>
-            <td>{{ entry.asset.symbol }}</td>
-            <td>{{ entry.asset.name|default:"N/A" }}</td>
-            <td>{{ entry.added_at }}</td>
-            <td>
-              <form method="post" action="{% url 'watchlist-remove' entry.pk %}">
-                {% csrf_token %}
-                <button type="submit">Remove</button>
-              </form>
-            </td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p>Your watchlist is empty. Add assets from the asset list.</p>
-  {% endif %}
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary-subtle gap-3">
+    <div>
+      <h1 class="h2 mb-1">Your Watchlist</h1>
+      <p class="text-muted mb-0">Assets you are monitoring. Click an asset to see all metrics and score details.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'home' %}" class="btn btn-outline-light">
+        <i class="bi bi-house me-1"></i>Home Dashboard
+      </a>
+      <a href="{% url 'asset-list' %}" class="btn btn-primary">
+        <i class="bi bi-plus-circle me-1"></i>Add More Assets
+      </a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-header bg-dark-subtle d-flex justify-content-between align-items-center py-3">
+      <h5 class="mb-0 fw-semibold">
+        <i class="bi bi-star-fill text-warning me-2"></i>Monitored Assets
+      </h5>
+      <span class="text-muted small">{{ entries|length }} item{{ entries|length|pluralize }} saved</span>
+    </div>
+    <div class="card-body p-0">
+      {% if entries %}
+        <div class="table-responsive">
+          <table class="table table-hover table-striped mb-0 align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th scope="col" style="min-width: 140px;">Symbol</th>
+                <th scope="col" style="min-width: 220px;">Name</th>
+                <th scope="col">Asset Type</th>
+                <th scope="col">Added On</th>
+                <th scope="col" class="text-center" style="width: 180px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for entry in entries %}
+                <tr>
+                  <td>
+                    <a href="{% url 'asset-detail' entry.asset.pk %}" class="fw-bold text-decoration-none text-primary fs-6">
+                      <i class="bi bi-box-arrow-up-right me-1 small"></i>{{ entry.asset.symbol }}
+                    </a>
+                  </td>
+                  <td>
+                    <span class="text-body-secondary">{{ entry.asset.name|default:"—" }}</span>
+                  </td>
+                  <td>
+                    <span class="badge bg-secondary-subtle text-secondary-emphasis">
+                      {{ entry.asset.get_asset_type_display }}
+                    </span>
+                  </td>
+                  <td class="text-muted small">{{ entry.added_at|date:"Y-m-d H:i" }}</td>
+                  <td class="text-center">
+                    <div class="btn-group btn-group-sm" role="group">
+                      <a href="{% url 'asset-detail' entry.asset.pk %}" class="btn btn-outline-info">
+                        <i class="bi bi-eye"></i> View
+                      </a>
+                      <form method="post" action="{% url 'watchlist-remove' entry.pk %}" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{% url 'watchlist' %}">
+                        <button type="submit" class="btn btn-outline-danger" title="Remove from watchlist">
+                          <i class="bi bi-trash"></i> Remove
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="p-5 text-center text-muted">
+          <i class="bi bi-star text-secondary fs-1 d-block mb-3"></i>
+          <h4 class="h5">Your watchlist is empty</h4>
+          <p class="mb-3">Browse available assets and star the ones you want to track on your home screen.</p>
+          <a href="{% url 'asset-list' %}" class="btn btn-primary">
+            <i class="bi bi-search me-1"></i>Browse Available Assets
+          </a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
 {% endblock %}

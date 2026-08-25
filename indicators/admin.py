@@ -21,17 +21,18 @@ class MetricSnapshotInline(admin.TabularInline):
     extra = 0
     ordering = ("-timestamp",)
     readonly_fields = ("date",)
+    exclude = ("shin_indicator", "source")
 
 
 @admin.register(MetricSnapshot)
 class MetricSnapshotAdmin(admin.ModelAdmin):
     list_display = (
         "asset", "timestamp", "p_l", "p_vp", "dy", "margem_liquida",
-        "shin_indicator", "source",
     )
     list_filter = ("asset",)
     search_fields = ("asset__symbol",)
     readonly_fields = ("date",)
+    exclude = ("shin_indicator", "source")
 
 
 @admin.register(Asset)

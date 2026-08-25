@@ -1,18 +1,53 @@
 {% extends "base.html" %}
 
-{% block title %}Indicators | Shin Indicator{% endblock %}
+{% block title %}Composite Indicators &amp; Scores | Invest Shin{% endblock %}
 
 {% block content %}
-  <h1>Composite Indicators</h1>
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary-subtle gap-3">
+    <div>
+      <h1 class="h2 mb-1">Composite Indicators</h1>
+      <p class="text-muted mb-0">Select an indicator to inspect asset metrics, score formulas, and comparisons.</p>
+    </div>
+    <div>
+      <a href="{% url 'asset-list' %}" class="btn btn-outline-light">
+        <i class="bi bi-collection me-1"></i>All Assets
+      </a>
+    </div>
+  </div>
+
   {% if indicators %}
-    <ul>
+    <div class="row g-4">
       {% for indicator in indicators %}
-        <li>
-          <a href="{% url 'indicator-detail' indicator.pk %}">{{ indicator.name }}</a>
-        </li>
+        <div class="col-md-6 col-lg-4">
+          <div class="card h-100 shadow-sm metric-card">
+            <div class="card-body p-4 d-flex flex-column">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <h4 class="card-title fw-bold mb-0">
+                  <a href="{% url 'indicator-detail' indicator.pk %}" class="text-decoration-none text-light">
+                    {{ indicator.name }}
+                  </a>
+                </h4>
+                <span class="badge bg-primary">{{ indicator.formula_code|default:"Composite" }}</span>
+              </div>
+              <p class="card-text text-body-secondary flex-grow-1 small my-3">
+                {{ indicator.description|default:"Composite scoring algorithm integrating valuation, dividend yield, profitability, and multi-year CAGR metrics." }}
+              </p>
+              <div class="pt-3 border-top border-secondary-subtle d-flex justify-content-between align-items-center">
+                <span class="text-muted small">Updated: {{ indicator.updated_at|date:"Y-m-d" }}</span>
+                <a href="{% url 'indicator-detail' indicator.pk %}" class="btn btn-primary btn-sm">
+                  <i class="bi bi-table me-1"></i>View Matrix &rarr;
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
       {% endfor %}
-    </ul>
+    </div>
   {% else %}
-    <p>No indicators are available yet.</p>
+    <div class="card p-5 text-center text-muted">
+      <i class="bi bi-speedometer2 fs-1 mb-3 text-secondary"></i>
+      <h4 class="h5">No composite indicators found</h4>
+      <p class="mb-0">Run default initialization or create indicators in the admin panel.</p>
+    </div>
   {% endif %}
 {% endblock %}

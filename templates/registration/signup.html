@@ -1,12 +1,62 @@
 {% extends "base.html" %}
 
-{% block title %}Sign up | Shin Indicator{% endblock %}
+{% block title %}Sign Up | Invest Shin{% endblock %}
 
 {% block content %}
-  <h1>Create your account</h1>
-  <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Sign up</button>
-  </form>
+  <div class="row justify-content-center my-5">
+    <div class="col-md-7 col-lg-6">
+      <div class="card shadow border-secondary-subtle">
+        <div class="card-header bg-dark-subtle text-center py-4">
+          <i class="bi bi-person-plus-fill fs-1 text-primary mb-2"></i>
+          <h2 class="h4 mb-0 fw-bold">Create an Account</h2>
+          <p class="text-muted small mb-0 mt-1">Start organizing your assets and tracking indicator scores</p>
+        </div>
+        <div class="card-body p-4">
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger py-2">
+              {% for error in form.non_field_errors %}
+                <p class="mb-0 small">{{ error }}</p>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <form method="post">
+            {% csrf_token %}
+            {% for field in form %}
+              <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label small fw-semibold">
+                  {{ field.label }}
+                </label>
+                <input
+                  type="{{ field.field.widget.input_type|default:'text' }}"
+                  name="{{ field.name }}"
+                  id="{{ field.id_for_label }}"
+                  class="form-control {% if field.errors %}is-invalid{% endif %}"
+                  value="{{ field.value|default:'' }}"
+                  {% if field.field.required %}required{% endif %}
+                >
+                {% if field.help_text %}
+                  <div class="form-text text-muted small">{{ field.help_text|safe }}</div>
+                {% endif %}
+                {% if field.errors %}
+                  <div class="invalid-feedback d-block">
+                    {{ field.errors|striptags }}
+                  </div>
+                {% endif %}
+              </div>
+            {% endfor %}
+
+            <button type="submit" class="btn btn-primary w-100 py-2 mt-3">
+              <i class="bi bi-person-check me-1"></i>Sign Up
+            </button>
+          </form>
+
+          <div class="text-center mt-4 pt-3 border-top border-secondary-subtle small">
+            <span class="text-muted">Already have an account?</span>
+            <a href="{% url 'login' %}" class="text-primary text-decoration-none fw-semibold ms-1">Login here</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 {% endblock %}

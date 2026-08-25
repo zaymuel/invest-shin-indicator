@@ -1,35 +1,130 @@
 {% extends "base.html" %}
 
-{% block title %}Assets | Shin Indicator{% endblock %}
+{% block title %}All Tracked Assets | Invest Shin{% endblock %}
 
 {% block content %}
-  <h1>Available Assets</h1>
-  {% if assets %}
-    <table>
-      <thead>
-        <tr>
-          <th>Symbol</th>
-          <th>Name</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for asset in assets %}
-          <tr>
-            <td>{{ asset.symbol }}</td>
-            <td>{{ asset.name|default:"N/A" }}</td>
-            <td>
-              <form method="post" action="{% url 'watchlist-add' %}">
-                {% csrf_token %}
-                <input type="hidden" name="asset_id" value="{{ asset.id }}">
-                <button type="submit">Add to watchlist</button>
-              </form>
-            </td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p>No assets are available yet.</p>
-  {% endif %}
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary-subtle gap-3">
+    <div>
+      <h1 class="h2 mb-1">Available Assets</h1>
+      <p class="text-muted mb-0">Browse all monitored stocks, REITs, Ações, and FIIs.</p>
+    </div>
+    <div class="d-flex gap-2">
+      {% if first_indicator %}
+        <a href="{% url 'indicator-detail' first_indicator.pk %}" class="btn btn-outline-info">
+          <i class="bi bi-table me-1"></i>All Indicator Scores
+        </a>
+      {% endif %}
+      {% if user.is_authenticated %}
+        <a href="{% url 'watchlist' %}" class="btn btn-primary">
+          <i class="bi bi-star me-1"></i>My Watchlist
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-header bg-dark-subtle d-flex justify-content-between align-items-center py-3">
+      <h5 class="mb-0 fw-semibold">
+        <i class="bi bi-collection me-2"></i>Asset Directory
+      </h5>
+      <span class="text-muted small">{{ asset_rows|length }} asset{{ asset_rows|length|pluralize }} in catalog</span>
+    </div>
+    <div class="card-body p-0">
+      {% if asset_rows %}
+        <div class="table-responsive">
+          <table class="table table-hover table-striped mb-0 align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th scope="col" style="min-width: 140px;">Symbol</th>
+                <th scope="col" style="min-width: 220px;">Name</th>
+                <th scope="col">Asset Type</th>
+                <th scope="col" class="text-end">P/L</th>
+                <th scope="col" class="text-end">P/VP</th>
+                <th scope="col" class="text-end">DY (%)</th>
+                <th scope="col" class="text-center" style="min-width: 140px;">SHIN Score</th>
+                <th scope="col" class="text-center" style="width: 200px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in asset_rows %}
+                <tr>
+                  <td>
+                    <a href="{% url 'asset-detail' item.asset.pk %}" class="fw-bold text-decoration-none text-primary fs-6">
+                      <i class="bi bi-box-arrow-up-right me-1 small"></i>{{ item.asset.symbol }}
+                    </a>
+                  </td>
+                  <td>
+                    <span class="text-body-secondary">{{ item.asset.name|default:"—" }}</span>
+                  </td>
+                  <td>
+                    <span class="badge bg-secondary-subtle text-secondary-emphasis">
+                      {{ item.asset.get_asset_type_display }}
+                    </span>
+                  </td>
+                  <td class="text-end">
+                    {% if item.snapshot and item.snapshot.p_l is not None %}
+                      {{ item.snapshot.p_l|floatformat:2 }}
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    {% if item.snapshot and item.snapshot.p_vp is not None %}
+                      {{ item.snapshot.p_vp|floatformat:2 }}
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    {% if item.snapshot and item.snapshot.dy is not None %}
+                      <span class="badge bg-success-subtle text-success-emphasis">{{ item.snapshot.dy|floatformat:2 }}%</span>
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    {% if item.shin_indicator is not None %}
+                      <span class="badge bg-primary-subtle text-primary-emphasis badge-indicator fw-semibold">
+                        {{ item.shin_indicator|floatformat:4 }}
+                      </span>
+                    {% else %}
+                      <span class="badge bg-secondary-subtle text-muted">N/A</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    <div class="d-flex justify-content-center align-items-center gap-1">
+                      <a href="{% url 'asset-detail' item.asset.pk %}" class="btn btn-outline-info btn-sm">
+                        <i class="bi bi-eye"></i> Details
+                      </a>
+                      {% if user.is_authenticated %}
+                        {% if item.is_watched %}
+                          <button class="btn btn-warning btn-sm" disabled title="Already in watchlist">
+                            <i class="bi bi-star-fill"></i>
+                          </button>
+                        {% else %}
+                          <form method="post" action="{% url 'watchlist-add' %}" class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="asset_id" value="{{ item.asset.id }}">
+                            <input type="hidden" name="next" value="{% url 'asset-list' %}">
+                            <button type="submit" class="btn btn-outline-warning btn-sm" title="Add to watchlist">
+                              <i class="bi bi-star"></i>
+                            </button>
+                          </form>
+                        {% endif %}
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="p-5 text-center text-muted">
+          <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+          No assets are available yet. Add assets in the admin panel.
+        </div>
+      {% endif %}
+    </div>
+  </div>
 {% endblock %}

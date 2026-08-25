@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | Invest Shin Indicator{% endblock %}
+
+{% block content %}
+  {% if user.is_authenticated %}
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary-subtle gap-3">
+      <div>
+        <h1 class="h2 mb-1">My Watched Assets</h1>
+        <p class="text-muted mb-0">
+          Tracking {{ total_watched }} asset{{ total_watched|pluralize }} across asset classes.
+        </p>
+      </div>
+      <div class="d-flex gap-2">
+        {% if first_indicator %}
+          <a href="{% url 'indicator-detail' first_indicator.pk %}" class="btn btn-outline-info">
+            <i class="bi bi-table me-1"></i>All Indicator Scores
+          </a>
+        {% endif %}
+        <a href="{% url 'asset-list' %}" class="btn btn-primary">
+          <i class="bi bi-plus-circle me-1"></i>Browse Assets
+        </a>
+      </div>
+    </div>
+
+    {% if grouped_assets %}
+      {% for group in grouped_assets %}
+        <div class="card mb-4 shadow-sm">
+          <div class="card-header bg-dark-subtle border-secondary-subtle d-flex justify-content-between align-items-center py-3">
+            <h5 class="mb-0 fw-semibold">
+              <span class="badge bg-primary me-2">{{ group.type_label }}</span>
+              <span class="text-muted small">({{ group.count }} asset{{ group.count|pluralize }})</span>
+            </h5>
+            <span class="badge bg-secondary-subtle text-secondary-emphasis">Asset Class: {{ group.type_code|upper }}</span>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-hover table-striped mb-0 align-middle">
+                <thead class="table-dark">
+                  <tr>
+                    <th scope="col" style="min-width: 130px;">Symbol</th>
+                    <th scope="col" style="min-width: 200px;">Name</th>
+                    <th scope="col" class="text-end">P/L</th>
+                    <th scope="col" class="text-end">P/VP</th>
+                    <th scope="col" class="text-end">DY (%)</th>
+                    <th scope="col" class="text-end">Marg. Líq (%)</th>
+                    <th scope="col" class="text-center" style="min-width: 140px;">SHIN Score</th>
+                    <th scope="col" style="min-width: 140px;">Last Scraped</th>
+                    <th scope="col" class="text-center" style="width: 160px;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in group.items %}
+                    <tr>
+                      <td>
+                        <a href="{% url 'asset-detail' item.asset.pk %}" class="fw-bold text-decoration-none text-primary fs-6">
+                          <i class="bi bi-box-arrow-up-right me-1 small"></i>{{ item.asset.symbol }}
+                        </a>
+                      </td>
+                      <td>
+                        <span class="text-body-secondary">{{ item.asset.name|default:"—" }}</span>
+                      </td>
+                      <td class="text-end">
+                        {% if item.snapshot and item.snapshot.p_l is not None %}
+                          {{ item.snapshot.p_l|floatformat:2 }}
+                        {% else %}
+                          <span class="text-muted">—</span>
+                        {% endif %}
+                      </td>
+                      <td class="text-end">
+                        {% if item.snapshot and item.snapshot.p_vp is not None %}
+                          {{ item.snapshot.p_vp|floatformat:2 }}
+                        {% else %}
+                          <span class="text-muted">—</span>
+                        {% endif %}
+                      </td>
+                      <td class="text-end">
+                        {% if item.snapshot and item.snapshot.dy is not None %}
+                          <span class="badge bg-success-subtle text-success-emphasis">{{ item.snapshot.dy|floatformat:2 }}%</span>
+                        {% else %}
+                          <span class="text-muted">—</span>
+                        {% endif %}
+                      </td>
+                      <td class="text-end">
+                        {% if item.snapshot and item.snapshot.margem_liquida is not None %}
+                          {{ item.snapshot.margem_liquida|floatformat:2 }}%
+                        {% else %}
+                          <span class="text-muted">—</span>
+                        {% endif %}
+                      </td>
+                      <td class="text-center">
+                        {% if item.shin_indicator is not None %}
+                          <span class="badge bg-primary-subtle text-primary-emphasis badge-indicator fw-semibold">
+                            {{ item.shin_indicator|floatformat:4 }}
+                          </span>
+                        {% else %}
+                          <span class="badge bg-secondary-subtle text-muted">N/A</span>
+                        {% endif %}
+                      </td>
+                      <td class="text-muted small">
+                        {% if item.snapshot %}
+                          {{ item.snapshot.timestamp|date:"Y-m-d H:i" }}
+                        {% else %}
+                          <span class="badge bg-warning-subtle text-warning-emphasis">Not scraped</span>
+                        {% endif %}
+                      </td>
+                      <td class="text-center">
+                        <div class="btn-group btn-group-sm" role="group">
+                          <a href="{% url 'asset-detail' item.asset.pk %}" class="btn btn-outline-info btn-sm" title="View dedicated metrics">
+                            <i class="bi bi-eye"></i> View
+                          </a>
+                          {% if item.entry_id %}
+                            <form method="post" action="{% url 'watchlist-remove' item.entry_id %}" class="d-inline">
+                              {% csrf_token %}
+                              <input type="hidden" name="next" value="{% url 'home' %}">
+                              <button type="submit" class="btn btn-outline-danger btn-sm" title="Remove from watchlist">
+                                <i class="bi bi-star-fill text-warning"></i>
+                              </button>
+                            </form>
+                          {% endif %}
+                        </div>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="card p-5 text-center my-4 border-dashed">
+        <div class="mb-3">
+          <i class="bi bi-star text-warning" style="font-size: 3rem;"></i>
+        </div>
+        <h3 class="h4">Your watchlist is currently empty</h3>
+        <p class="text-muted max-w-md mx-auto mb-4">
+          Add assets to your watchlist to track their latest financial metrics, CAGR growth, and SHIN indicator scores grouped by asset class right here on your home dashboard.
+        </p>
+        <div class="d-flex justify-content-center gap-3">
+          <a href="{% url 'asset-list' %}" class="btn btn-primary btn-lg">
+            <i class="bi bi-plus-circle me-1"></i>Browse Available Assets
+          </a>
+          {% if first_indicator %}
+            <a href="{% url 'indicator-detail' first_indicator.pk %}" class="btn btn-outline-light btn-lg">
+              <i class="bi bi-table me-1"></i>View All Indicator Scores
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+
+  {% else %}
+    <!-- Guest Hero & Call to Action -->
+    <div class="p-5 mb-4 bg-dark-subtle rounded-3 border border-secondary-subtle">
+      <div class="container-fluid py-4">
+        <div class="row align-items-center g-4">
+          <div class="col-lg-8">
+            <span class="badge bg-primary mb-2">Automated Investment Analytics</span>
+            <h1 class="display-5 fw-bold mb-3">Invest Shin Indicator Dashboard</h1>
+            <p class="lead text-body-secondary mb-4">
+              Track stock and REIT fundamentals, automated time-series scraping, and the composite SHIN indicator to identify high-value investments with precision.
+            </p>
+            <div class="d-flex flex-wrap gap-3">
+              <a href="{% url 'signup' %}" class="btn btn-primary btn-lg px-4">
+                <i class="bi bi-person-plus me-1"></i>Create Free Account
+              </a>
+              <a href="{% url 'login' %}" class="btn btn-outline-light btn-lg px-4">
+                <i class="bi bi-box-arrow-in-right me-1"></i>Login
+              </a>
+              {% if first_indicator %}
+                <a href="{% url 'indicator-detail' first_indicator.pk %}" class="btn btn-outline-info btn-lg px-4">
+                  <i class="bi bi-table me-1"></i>Explore Indicator Matrix
+                </a>
+              {% endif %}
+            </div>
+          </div>
+          <div class="col-lg-4 text-center">
+            <div class="card bg-body-tertiary border-primary p-4 shadow">
+              <i class="bi bi-shield-check text-primary mb-3" style="font-size: 3rem;"></i>
+              <h5 class="card-title">Live Tracking</h5>
+              <p class="card-text text-muted small">
+                {{ total_assets_count }} active asset{{ total_assets_count|pluralize }} monitored across StatusInvest and Yahoo Finance.
+              </p>
+              <a href="{% url 'asset-list' %}" class="btn btn-sm btn-outline-primary">
+                View Asset Catalog &rarr;
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

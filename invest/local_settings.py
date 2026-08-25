@@ -71,8 +71,8 @@ TEMPLATES = [
 
 AUTH_USER_MODEL = 'users.User'
 
-LOGIN_REDIRECT_URL = 'indicator-list'
-LOGOUT_REDIRECT_URL = 'indicator-list'
+LOGIN_REDIRECT_URL = 'home'
+LOGOUT_REDIRECT_URL = 'home'
 LOGIN_URL = 'login'
 
 WSGI_APPLICATION = 'invest.wsgi.application'

@@ -1,72 +1,108 @@
 {% extends "base.html" %}
 
-{% block title %}{{ indicator.name }} | Shin Indicator{% endblock %}
+{% block title %}{{ indicator.name }} — Matrix &amp; Scores | Invest Shin{% endblock %}
 
 {% block content %}
-  <h1>{{ indicator.name }}</h1>
-  {% if indicator.description %}
-    <p>{{ indicator.description }}</p>
-  {% endif %}
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'home' %}">Home</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'indicator-list' %}">Indicators</a></li>
+      <li class="breadcrumb-item active" aria-current="page">{{ indicator.name }}</li>
+    </ol>
+  </nav>
 
-  <h2>Current Metrics</h2>
-  {% if metrics %}
-    <table>
-      <thead>
-        <tr>
-          <th>Metric</th>
-          <th>Latest Value</th>
-          <th>Timestamp</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for metric in metrics %}
-          <tr>
-            <td>{{ metric.name }}</td>
-            <td>
-              {% if metric.latest_value is not None %}
-                {{ metric.latest_value }} {{ metric.unit }}
-              {% else %}
-                N/A
-              {% endif %}
-            </td>
-            <td>
-              {% if metric.latest_timestamp %}
-                {{ metric.latest_timestamp }}
-              {% else %}
-                N/A
-              {% endif %}
-            </td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p>No metrics have been configured yet.</p>
-  {% endif %}
+  <div class="card mb-4 shadow-sm border-secondary-subtle">
+    <div class="card-body p-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <h1 class="display-6 fw-bold mb-0">{{ indicator.name }}</h1>
+            <span class="badge bg-primary fs-6">{{ indicator.formula_code|default:"Composite" }}</span>
+          </div>
+          {% if indicator.description %}
+            <p class="text-muted mb-0 fs-6">{{ indicator.description }}</p>
+          {% endif %}
+        </div>
+        <div>
+          <a href="{% url 'asset-list' %}" class="btn btn-outline-light">
+            <i class="bi bi-collection me-1"></i>View Asset Catalog
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
 
-  <h2>Recent History</h2>
-  {% if recent_history %}
-    <table>
-      <thead>
-        <tr>
-          <th>Metric</th>
-          <th>Value</th>
-          <th>Timestamp</th>
-          <th>Source</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for record in recent_history %}
-          <tr>
-            <td>{{ record.metric.name }}</td>
-            <td>{{ record.value }} {{ record.metric.unit }}</td>
-            <td>{{ record.timestamp }}</td>
-            <td>{{ record.source|default:"N/A" }}</td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p>No historical records available yet.</p>
-  {% endif %}
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-dark-subtle d-flex justify-content-between align-items-center py-3">
+      <h5 class="mb-0 fw-semibold">
+        <i class="bi bi-table me-2"></i>Indicator Matrix (All Tracked Assets &amp; Metric Values)
+      </h5>
+      <span class="text-muted small">Updated with the most recent snapshot per asset</span>
+    </div>
+    <div class="card-body p-0">
+      {% if rows %}
+        <div class="table-responsive">
+          <table class="table table-hover table-striped mb-0 align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th scope="col" style="min-width: 140px;">Asset</th>
+                <th scope="col">Type</th>
+                {% for label in metric_labels %}
+                  <th scope="col" class="text-end" style="min-width: 110px;">{{ label }}</th>
+                {% endfor %}
+                <th scope="col" class="text-center bg-primary bg-opacity-25" style="min-width: 140px;">
+                  {{ indicator.name }}
+                </th>
+                <th scope="col" class="text-center" style="width: 100px;">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in rows %}
+                <tr>
+                  <td>
+                    <a href="{% url 'asset-detail' row.asset.pk %}" class="fw-bold text-decoration-none text-primary fs-6">
+                      <i class="bi bi-box-arrow-up-right me-1 small"></i>{{ row.asset.symbol }}
+                    </a>
+                  </td>
+                  <td>
+                    <span class="badge bg-secondary-subtle text-secondary-emphasis">
+                      {{ row.asset.get_asset_type_display }}
+                    </span>
+                  </td>
+                  {% for value in row.metric_values %}
+                    <td class="text-end">
+                      {% if value is not None %}
+                        {{ value|floatformat:2 }}
+                      {% else %}
+                        <span class="text-muted">—</span>
+                      {% endif %}
+                    </td>
+                  {% endfor %}
+                  <td class="text-center bg-primary bg-opacity-10">
+                    {% if row.indicator_value is not None %}
+                      <span class="badge bg-primary-subtle text-primary-emphasis badge-indicator fw-semibold">
+                        {{ row.indicator_value|floatformat:4 }}
+                      </span>
+                    {% else %}
+                      <span class="badge bg-secondary-subtle text-muted">N/A</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    <a href="{% url 'asset-detail' row.asset.pk %}" class="btn btn-sm btn-outline-info" title="View asset details">
+                      <i class="bi bi-eye"></i>
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="p-5 text-center text-muted">
+          <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+          No tracked assets available yet.
+        </div>
+      {% endif %}
+    </div>
+  </div>
 {% endblock %}
