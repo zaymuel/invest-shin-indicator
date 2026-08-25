@@ -4,7 +4,7 @@ from django.db.models import OuterRef, Subquery
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.views import View
-from django.views.generic import DetailView, ListView
+from django.views.generic import DetailView, ListView, TemplateView
 
 from .models import (
     Asset,
@@ -12,6 +12,74 @@ from .models import (
     MetricSnapshot,
     WatchlistEntry,
 )
+
+
+class HomeView(TemplateView):
+    template_name = "indicators/home.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        first_indicator = CompositeIndicator.objects.first()
+        context["first_indicator"] = first_indicator
+
+        if not user.is_authenticated:
+            context["total_assets_count"] = Asset.objects.filter(
+                is_active=True).count()
+            return context
+
+        entries = (
+            WatchlistEntry.objects.filter(user=user)
+            .select_related("asset")
+            .order_by("asset__symbol")
+        )
+
+        watched_asset_ids = [entry.asset_id for entry in entries]
+        latest_snapshot = MetricSnapshot.objects.filter(
+            asset=OuterRef("pk")
+        ).order_by("-timestamp")
+
+        assets_with_snapshots = (
+            Asset.objects.filter(id__in=watched_asset_ids, is_active=True)
+            .annotate(latest_snapshot_id=Subquery(latest_snapshot.values("pk")[:1]))
+        )
+
+        snapshot_ids = [
+            a.latest_snapshot_id for a in assets_with_snapshots if a.latest_snapshot_id
+        ]
+        snapshots_by_id = {
+            s.id: s
+            for s in MetricSnapshot.objects.filter(id__in=snapshot_ids)
+        }
+
+        entry_map = {entry.asset_id: entry.id for entry in entries}
+        asset_info = {}
+        for asset in assets_with_snapshots:
+            snapshot = snapshots_by_id.get(asset.latest_snapshot_id)
+            asset_info[asset.id] = {
+                "asset": asset,
+                "snapshot": snapshot,
+                "entry_id": entry_map.get(asset.id),
+                "shin_indicator": snapshot.shin_indicator if snapshot else None,
+            }
+
+        grouped_assets = []
+        for type_code, type_label in Asset.ASSET_TYPE_CHOICES:
+            type_items = [
+                item for item in asset_info.values()
+                if item["asset"].asset_type == type_code
+            ]
+            if type_items:
+                grouped_assets.append({
+                    "type_code": type_code,
+                    "type_label": type_label,
+                    "items": type_items,
+                    "count": len(type_items),
+                })
+
+        context["grouped_assets"] = grouped_assets
+        context["total_watched"] = len(asset_info)
+        return context
 
 
 class CompositeIndicatorListView(ListView):
@@ -64,11 +132,10 @@ class CompositeIndicatorDetailView(DetailView):
         return context
 
 
-class AssetListView(LoginRequiredMixin, ListView):
+class AssetListView(ListView):
     model = Asset
     template_name = "indicators/asset_list.html"
     context_object_name = "assets"
-    login_url = reverse_lazy("login")
 
     def get_queryset(self):
         latest_snapshot = MetricSnapshot.objects.filter(
@@ -182,19 +249,27 @@ class WatchlistAddView(LoginRequiredMixin, View):
             user=request.user, asset=asset
         )
         if created:
-            messages.success(request, f"{asset.symbol} added to your watchlist.")
+            messages.success(
+                request, f"{asset.symbol} added to your watchlist.")
         else:
-            messages.info(request, f"{asset.symbol} is already in your watchlist.")
-        return redirect("watchlist")
+            messages.info(
+                request, f"{asset.symbol} is already in your watchlist.")
+
+        next_url = request.POST.get("next") or request.META.get(
+            "HTTP_REFERER") or reverse_lazy("home")
+        return redirect(next_url)
 
 
 class WatchlistRemoveView(LoginRequiredMixin, View):
     login_url = reverse_lazy("login")
 
     def post(self, request, *args, **kwargs):
-        entry = get_object_or_404(WatchlistEntry, id=kwargs.get("pk"), user=request.user)
+        entry = get_object_or_404(
+            WatchlistEntry, id=kwargs.get("pk"), user=request.user)
         asset_symbol = entry.asset.symbol
         entry.delete()
         messages.info(request, f"{asset_symbol} removed from your watchlist.")
-        return redirect("watchlist")
 
+        next_url = request.POST.get("next") or request.META.get(
+            "HTTP_REFERER") or reverse_lazy("home")
+        return redirect(next_url)

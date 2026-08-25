@@ -71,6 +71,11 @@ class MetricSnapshot(models.Model):
     METRIC_LUCROS_CAGR5 = "lucros_cagr5"
     METRIC_FFO_CAGR3 = "ffo_cagr3"
     METRIC_FFO_CAGR5 = "ffo_cagr5"
+    METRIC_CAIXA = "caixa"
+    METRIC_DY_CAGR3 = "dy_cagr3"
+    METRIC_DY_CAGR5 = "dy_cagr5"
+    METRIC_VALOR_CAGR3 = "valor_cagr3"
+    METRIC_VALOR_CAGR5 = "valor_cagr5"
 
     # Common to every asset type.
     METRIC_FIELDS = (
@@ -78,14 +83,20 @@ class MetricSnapshot(models.Model):
         METRIC_P_VP,
         METRIC_DY,
         METRIC_MARGEM_LIQUIDA,
-        # Ações / FIIs growth (net income / revenue based).
+        # Ações growth (net income / revenue based).
         METRIC_RECEITAS_CAGR3,
         METRIC_RECEITAS_CAGR5,
         METRIC_LUCROS_CAGR3,
         METRIC_LUCROS_CAGR5,
-        # REIT growth (FFO based) - not directly comparable to the CAGR fields above.
+        # REIT growth (FFO based).
         METRIC_FFO_CAGR3,
         METRIC_FFO_CAGR5,
+        # FIIs specific metrics.
+        METRIC_CAIXA,
+        METRIC_DY_CAGR3,
+        METRIC_DY_CAGR5,
+        METRIC_VALOR_CAGR3,
+        METRIC_VALOR_CAGR5,
     )
 
     METRIC_LABELS = {
@@ -99,6 +110,11 @@ class MetricSnapshot(models.Model):
         METRIC_LUCROS_CAGR5: "CAGR Lucros 5a (%)",
         METRIC_FFO_CAGR3: "CAGR FFO 3a (%)",
         METRIC_FFO_CAGR5: "CAGR FFO 5a (%)",
+        METRIC_CAIXA: "Caixa (%)",
+        METRIC_DY_CAGR3: "CAGR DY 3a (%)",
+        METRIC_DY_CAGR5: "CAGR DY 5a (%)",
+        METRIC_VALOR_CAGR3: "CAGR Valor 3a (%)",
+        METRIC_VALOR_CAGR5: "CAGR Valor 5a (%)",
     }
 
     asset = models.ForeignKey(
@@ -140,11 +156,26 @@ class MetricSnapshot(models.Model):
     ffo_cagr5 = models.DecimalField(
         max_digits=10, decimal_places=3, null=True, blank=True,
         verbose_name="CAGR FFO 5a (%)")
+    caixa = models.DecimalField(
+        max_digits=10, decimal_places=3, null=True, blank=True,
+        verbose_name="Caixa (%)")
+    dy_cagr3 = models.DecimalField(
+        max_digits=10, decimal_places=3, null=True, blank=True,
+        verbose_name="CAGR DY 3a (%)")
+    dy_cagr5 = models.DecimalField(
+        max_digits=10, decimal_places=3, null=True, blank=True,
+        verbose_name="CAGR DY 5a (%)")
+    valor_cagr3 = models.DecimalField(
+        max_digits=10, decimal_places=3, null=True, blank=True,
+        verbose_name="CAGR Valor 3a (%)")
+    valor_cagr5 = models.DecimalField(
+        max_digits=10, decimal_places=3, null=True, blank=True,
+        verbose_name="CAGR Valor 5a (%)")
 
-    # Derived: which formula applies depends on the asset's type (not yet implemented; SHIN v1 is used for all types today).
+    # Derived: which formula applies depends on the asset's type (e.g. FIIs vs Ações/Stocks/REITs).
     shin_indicator = models.DecimalField(
         max_digits=15, decimal_places=6, null=True, blank=True,
-        verbose_name="SHIN Indicator")
+        editable=False, verbose_name="SHIN Indicator")
 
     class Meta:
         verbose_name = "Metric snapshot"
@@ -167,6 +198,9 @@ class MetricSnapshot(models.Model):
             if timezone.is_aware(self.timestamp)
             else self.timestamp.date()
         )
+        if self.shin_indicator is None:
+            from .services.calculations import calculate_snapshot_shin_score
+            self.shin_indicator = calculate_snapshot_shin_score(self)
         super().save(*args, **kwargs)
 
 
