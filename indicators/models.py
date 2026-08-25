@@ -1,5 +1,5 @@
 ﻿from django.conf import settings
-from django.db import models, transaction
+from django.db import models
 from django.utils import timezone
 
 
@@ -58,47 +58,8 @@ class CompositeIndicator(models.Model):
         return composite
 
 
-class CompositeIndicatorValue(models.Model):
-    composite = models.ForeignKey(
-        CompositeIndicator,
-        related_name="values",
-        on_delete=models.CASCADE,
-        verbose_name="composite indicator",
-    )
-    asset = models.ForeignKey(
-        "Asset",
-        related_name="indicator_values",
-        on_delete=models.CASCADE,
-        verbose_name="asset",
-    )
-    value = models.DecimalField(
-        max_digits=20, decimal_places=6, verbose_name="value")
-    timestamp = models.DateTimeField(
-        default=timezone.now, db_index=True, verbose_name="timestamp")
-    source = models.CharField(
-        max_length=255, blank=True, verbose_name="source")
-
-    class Meta:
-        verbose_name = "Composite indicator value"
-        verbose_name_plural = "Composite indicator values"
-        ordering = ["-timestamp"]
-        indexes = [
-            models.Index(fields=["composite", "asset",
-                         "-timestamp"], name="cmp_asset_ts_idx"),
-        ]
-
-    def __str__(self) -> str:
-        return f"{self.composite.name} - {self.asset.symbol} @ {self.timestamp:%Y-%m-%d %H:%M:%S}"
-
-
-class Metric(models.Model):
-    KIND_RAW = "raw"
-    KIND_DERIVED = "derived"
-
-    KIND_CHOICES = [
-        (KIND_RAW, "Raw"),
-        (KIND_DERIVED, "Derived"),
-    ]
+class MetricSnapshot(models.Model):
+    """One row per (asset, date): every metric scraped for that asset at that time, plus the derived indicator."""
 
     METRIC_P_L = "p_l"
     METRIC_P_VP = "p_vp"
@@ -108,120 +69,105 @@ class Metric(models.Model):
     METRIC_RECEITAS_CAGR5 = "receitas_cagr5"
     METRIC_LUCROS_CAGR3 = "lucros_cagr3"
     METRIC_LUCROS_CAGR5 = "lucros_cagr5"
+    METRIC_FFO_CAGR3 = "ffo_cagr3"
+    METRIC_FFO_CAGR5 = "ffo_cagr5"
 
-    METRIC_DEFINITIONS = {
-        METRIC_P_L: {"label": "P/L", "unit": "", "kind": KIND_RAW},
-        METRIC_P_VP: {"label": "P/VP", "unit": "", "kind": KIND_RAW},
-        METRIC_DY: {"label": "DY (%)", "unit": "%", "kind": KIND_RAW},
-        METRIC_MARGEM_LIQUIDA: {
-            "label": "Margem Líquida (%)",
-            "unit": "%",
-            "kind": KIND_RAW,
-        },
-        METRIC_RECEITAS_CAGR3: {
-            "label": "CAGR Receitas 3a (%)",
-            "unit": "%",
-            "kind": KIND_RAW,
-        },
-        METRIC_RECEITAS_CAGR5: {
-            "label": "CAGR Receitas 5a (%)",
-            "unit": "%",
-            "kind": KIND_RAW,
-        },
-        METRIC_LUCROS_CAGR3: {
-            "label": "CAGR Lucros 3a (%)",
-            "unit": "%",
-            "kind": KIND_RAW,
-        },
-        METRIC_LUCROS_CAGR5: {
-            "label": "CAGR Lucros 5a (%)",
-            "unit": "%",
-            "kind": KIND_RAW,
-        },
+    # Common to every asset type.
+    METRIC_FIELDS = (
+        METRIC_P_L,
+        METRIC_P_VP,
+        METRIC_DY,
+        METRIC_MARGEM_LIQUIDA,
+        # Ações / FIIs growth (net income / revenue based).
+        METRIC_RECEITAS_CAGR3,
+        METRIC_RECEITAS_CAGR5,
+        METRIC_LUCROS_CAGR3,
+        METRIC_LUCROS_CAGR5,
+        # REIT growth (FFO based) - not directly comparable to the CAGR fields above.
+        METRIC_FFO_CAGR3,
+        METRIC_FFO_CAGR5,
+    )
+
+    METRIC_LABELS = {
+        METRIC_P_L: "P/L",
+        METRIC_P_VP: "P/VP",
+        METRIC_DY: "DY (%)",
+        METRIC_MARGEM_LIQUIDA: "Margem Líquida (%)",
+        METRIC_RECEITAS_CAGR3: "CAGR Receitas 3a (%)",
+        METRIC_RECEITAS_CAGR5: "CAGR Receitas 5a (%)",
+        METRIC_LUCROS_CAGR3: "CAGR Lucros 3a (%)",
+        METRIC_LUCROS_CAGR5: "CAGR Lucros 5a (%)",
+        METRIC_FFO_CAGR3: "CAGR FFO 3a (%)",
+        METRIC_FFO_CAGR5: "CAGR FFO 5a (%)",
     }
 
-    METRIC_NAME_CHOICES = [
-        (metric_key, metric_data["label"])
-        for metric_key, metric_data in METRIC_DEFINITIONS.items()
-    ]
-
-    composite = models.ForeignKey(
-        CompositeIndicator,
-        related_name="metrics",
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        verbose_name="composite indicator",
-    )
     asset = models.ForeignKey(
         "Asset",
-        related_name="metrics",
+        related_name="metric_snapshots",
         on_delete=models.CASCADE,
-        null=True,
-        blank=True,
         verbose_name="asset",
     )
-    name = models.CharField(
-        max_length=120,
-        choices=METRIC_NAME_CHOICES,
-        verbose_name="metric name",
-    )
-    key = models.SlugField(max_length=60, verbose_name="key", editable=False)
-    unit = models.CharField(max_length=40, blank=True,
-                            verbose_name="unit", editable=False)
-    kind = models.CharField(
-        max_length=20, choices=KIND_CHOICES, default=KIND_RAW, verbose_name="kind")
-    is_active = models.BooleanField(default=True, verbose_name="active")
-    created_at = models.DateTimeField(
-        auto_now_add=True, verbose_name="created at")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="updated at")
-
-    class Meta:
-        verbose_name = "Metric"
-        verbose_name_plural = "Metrics"
-        unique_together = (("asset", "key"),)
-        ordering = ["name"]
-
-    def __str__(self) -> str:
-        return self.get_name_display()
-
-    def latest_history(self):
-        return self.history.order_by("-timestamp").first()
-
-    def save(self, *args, **kwargs):
-        definition = self.METRIC_DEFINITIONS.get(self.name)
-        if definition is None:
-            raise ValueError(f"Unsupported metric name: {self.name}")
-
-        self.key = self.name
-        self.unit = definition["unit"]
-        self.kind = definition["kind"]
-
-        super().save(*args, **kwargs)
-
-
-class MetricHistory(models.Model):
-    metric = models.ForeignKey(
-        Metric,
-        related_name="history",
-        on_delete=models.CASCADE,
-        verbose_name="metric",
-    )
-    value = models.DecimalField(
-        max_digits=20, decimal_places=6, verbose_name="value")
     timestamp = models.DateTimeField(
-        default=timezone.now, db_index=True, verbose_name="timestamp"
-    )
+        default=timezone.now, db_index=True, verbose_name="timestamp")
+    date = models.DateField(editable=False, db_index=True, verbose_name="date")
     source = models.CharField(
         max_length=255, blank=True, verbose_name="source")
 
+    p_l = models.DecimalField(
+        max_digits=20, decimal_places=3, null=True, blank=True, verbose_name="P/L")
+    p_vp = models.DecimalField(
+        max_digits=20, decimal_places=3, null=True, blank=True, verbose_name="P/VP")
+    dy = models.DecimalField(
+        max_digits=20, decimal_places=3, null=True, blank=True, verbose_name="DY (%)")
+    margem_liquida = models.DecimalField(
+        max_digits=20, decimal_places=3, null=True, blank=True,
+        verbose_name="Margem Líquida (%)")
+    receitas_cagr3 = models.DecimalField(
+        max_digits=20, decimal_places=3, null=True, blank=True,
+        verbose_name="CAGR Receitas 3a (%)")
+    receitas_cagr5 = models.DecimalField(
+        max_digits=20, decimal_places=3, null=True, blank=True,
+        verbose_name="CAGR Receitas 5a (%)")
+    lucros_cagr3 = models.DecimalField(
+        max_digits=20, decimal_places=3, null=True, blank=True,
+        verbose_name="CAGR Lucros 3a (%)")
+    lucros_cagr5 = models.DecimalField(
+        max_digits=20, decimal_places=3, null=True, blank=True,
+        verbose_name="CAGR Lucros 5a (%)")
+    ffo_cagr3 = models.DecimalField(
+        max_digits=20, decimal_places=3, null=True, blank=True,
+        verbose_name="CAGR FFO 3a (%)")
+    ffo_cagr5 = models.DecimalField(
+        max_digits=20, decimal_places=3, null=True, blank=True,
+        verbose_name="CAGR FFO 5a (%)")
+
+    # Derived: which formula applies depends on the asset's type (not yet implemented; SHIN v1 is used for all types today).
+    shin_indicator = models.DecimalField(
+        max_digits=20, decimal_places=6, null=True, blank=True,
+        verbose_name="SHIN Indicator")
+
     class Meta:
-        verbose_name = "Metric history"
-        verbose_name_plural = "Metric history"
+        verbose_name = "Metric snapshot"
+        verbose_name_plural = "Metric snapshots"
+        unique_together = (("asset", "date"),)
         ordering = ["-timestamp"]
+        indexes = [
+            models.Index(fields=["asset", "-timestamp"],
+                         name="asset_snapshot_ts_idx"),
+        ]
 
     def __str__(self) -> str:
-        return f"{self.metric.get_name_display()} @ {self.timestamp:%Y-%m-%d %H:%M:%S}"
+        return f"{self.asset.symbol} @ {self.timestamp:%Y-%m-%d %H:%M:%S}"
+
+    def save(self, *args, **kwargs):
+        if self.timestamp is None:
+            self.timestamp = timezone.now()
+        self.date = (
+            timezone.localtime(self.timestamp).date()
+            if timezone.is_aware(self.timestamp)
+            else self.timestamp.date()
+        )
+        super().save(*args, **kwargs)
 
 
 class Asset(models.Model):
@@ -260,24 +206,7 @@ class Asset(models.Model):
         is_new = self._state.adding
         super().save(*args, **kwargs)
         if is_new:
-            self.ensure_default_metrics()
-
-    def ensure_default_metrics(self):
-        CompositeIndicator.get_or_create_shin_definition()
-        with transaction.atomic():
-            for metric_name in Metric.METRIC_DEFINITIONS.keys():
-                defaults = {
-                    "name": metric_name,
-                    "is_active": True,
-                }
-                metric, created = Metric.objects.get_or_create(
-                    asset=self,
-                    key=metric_name,
-                    defaults=defaults,
-                )
-                if not created and metric.name != metric_name:
-                    metric.name = metric_name
-                    metric.save(update_fields=["name"])
+            CompositeIndicator.get_or_create_shin_definition()
 
 
 class WatchlistEntry(models.Model):

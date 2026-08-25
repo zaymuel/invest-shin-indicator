@@ -4,12 +4,10 @@ from django.utils.translation import ngettext
 from .models import (
     Asset,
     CompositeIndicator,
-    CompositeIndicatorValue,
-    Metric,
-    MetricHistory,
+    MetricSnapshot,
     WatchlistEntry,
 )
-from .services.calculations import compute_derived_metrics
+from .services.calculations import compute_shin_indicator
 
 
 @admin.register(CompositeIndicator)
@@ -18,37 +16,38 @@ class CompositeIndicatorAdmin(admin.ModelAdmin):
     search_fields = ("name",)
 
 
-@admin.register(CompositeIndicatorValue)
-class CompositeIndicatorValueAdmin(admin.ModelAdmin):
-    list_display = ("composite", "asset", "value", "timestamp", "source")
-    list_filter = ("composite", "asset")
-    search_fields = ("composite__name", "asset__symbol", "source")
-
-
-class MetricHistoryInline(admin.TabularInline):
-    model = MetricHistory
+class MetricSnapshotInline(admin.TabularInline):
+    model = MetricSnapshot
     extra = 0
     ordering = ("-timestamp",)
+    readonly_fields = ("date",)
 
 
-@admin.register(Metric)
-class MetricAdmin(admin.ModelAdmin):
-    list_display = ("asset", "name", "key", "unit",
-                    "kind", "is_active", "updated_at")
-    list_filter = ("is_active", "kind", "asset")
-    search_fields = ("asset__symbol", "name", "key")
-    readonly_fields = ("key", "unit", "kind")
-    inlines = [MetricHistoryInline]
-    actions = ["recalculate_selected_derived"]
+@admin.register(MetricSnapshot)
+class MetricSnapshotAdmin(admin.ModelAdmin):
+    list_display = (
+        "asset", "timestamp", "p_l", "p_vp", "dy", "margem_liquida",
+        "shin_indicator", "source",
+    )
+    list_filter = ("asset",)
+    search_fields = ("asset__symbol",)
+    readonly_fields = ("date",)
 
-    def recalculate_selected_derived(self, request, queryset):
-        assets = Asset.objects.filter(
-            id__in=queryset.values_list("asset_id", flat=True).distinct())
+
+@admin.register(Asset)
+class AssetAdmin(admin.ModelAdmin):
+    list_display = ("symbol", "name", "asset_type", "is_active")
+    list_filter = ("is_active", "asset_type")
+    search_fields = ("symbol", "name")
+    inlines = [MetricSnapshotInline]
+    actions = ["recalculate_selected_shin_indicator"]
+
+    def recalculate_selected_shin_indicator(self, request, queryset):
         computed_count = 0
-        for asset in assets:
-            computed = compute_derived_metrics(persist=True, asset=asset)
-            computed_count += sum(1 for value in computed.values()
-                                  if value is not None)
+        for asset in queryset:
+            value = compute_shin_indicator(asset, persist=True)
+            if value is not None:
+                computed_count += 1
 
         self.message_user(
             request,
@@ -61,21 +60,7 @@ class MetricAdmin(admin.ModelAdmin):
             messages.SUCCESS,
         )
 
-    recalculate_selected_derived.short_description = "Recalculate indicator values for selected assets"
-
-
-@admin.register(MetricHistory)
-class MetricHistoryAdmin(admin.ModelAdmin):
-    list_display = ("metric", "value", "timestamp", "source")
-    list_filter = ("metric",)
-    search_fields = ("metric__name", "source")
-
-
-@admin.register(Asset)
-class AssetAdmin(admin.ModelAdmin):
-    list_display = ("symbol", "name", "asset_type", "is_active")
-    list_filter = ("is_active", "asset_type")
-    search_fields = ("symbol", "name")
+    recalculate_selected_shin_indicator.short_description = "Recalculate SHIN indicator for selected assets"
 
 
 @admin.register(WatchlistEntry)

@@ -1,10 +1,7 @@
 ﻿import math
 from decimal import Decimal, InvalidOperation
 
-from django.db import transaction
-from django.utils import timezone
-
-from ..models import CompositeIndicator, CompositeIndicatorValue, Metric, MetricHistory
+from ..models import CompositeIndicator, MetricSnapshot
 
 
 def safe_decimal(value):
@@ -68,58 +65,28 @@ def _evaluate_shin_v1(formula: CompositeIndicator, latest_values: dict):
 
 
 def evaluate_formula(formula: CompositeIndicator, latest_values: dict):
+    # TODO: the formula/operands should eventually vary by asset type (e.g. REITs use FFO
+    # instead of net income/revenue CAGR). Only SHIN v1 is implemented today, for all types.
     if formula.formula_code == CompositeIndicator.FORMULA_SHIN_V1:
         return _evaluate_shin_v1(formula, latest_values)
     return None
 
 
-def _collect_latest_raw_metric_values(asset):
-    raw_metrics = Metric.objects.filter(
-        kind="raw", is_active=True, asset=asset)
-    latest_values = {}
-    for metric in raw_metrics:
-        latest_history = MetricHistory.objects.filter(
-            metric=metric).order_by("-timestamp").first()
-        if latest_history:
-            latest_values[metric.key] = latest_history.value
-    return latest_values
+def compute_shin_indicator(asset, persist=False):
+    """Compute the SHIN indicator from an asset's latest MetricSnapshot, optionally persisting it onto that row."""
+    snapshot = MetricSnapshot.objects.filter(
+        asset=asset).order_by("-timestamp").first()
+    if snapshot is None:
+        return None
 
+    formula = CompositeIndicator.get_or_create_shin_definition()
+    latest_values = {
+        field: getattr(snapshot, field) for field in MetricSnapshot.METRIC_FIELDS
+    }
+    value = evaluate_formula(formula, latest_values)
 
-def compute_derived_metrics(derived_keys=None, persist=False, source_label="calculated", asset=None):
-    # Kept function name for compatibility with existing callers.
-    if asset is None:
-        return {}
+    if persist and value is not None:
+        snapshot.shin_indicator = value
+        snapshot.save(update_fields=["shin_indicator"])
 
-    latest_values = _collect_latest_raw_metric_values(asset=asset)
-    indicators = CompositeIndicator.objects.exclude(
-        formula_code__isnull=True).exclude(formula_code="")
-
-    if derived_keys:
-        # If a caller passes metric keys, allow only SHIN-related calls for compatibility.
-        allowed = set(derived_keys)
-        if "shin_indicator" not in allowed:
-            return {}
-
-    now = timezone.now()
-    create_items = []
-    results = {}
-
-    for indicator in indicators:
-        value = evaluate_formula(indicator, latest_values)
-        results[indicator.name] = value
-        if persist and value is not None:
-            create_items.append(
-                CompositeIndicatorValue(
-                    composite=indicator,
-                    asset=asset,
-                    value=value,
-                    timestamp=now,
-                    source=source_label,
-                )
-            )
-
-    if create_items:
-        with transaction.atomic():
-            CompositeIndicatorValue.objects.bulk_create(create_items)
-
-    return results
+    return value

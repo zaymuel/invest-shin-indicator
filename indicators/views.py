@@ -9,9 +9,7 @@ from django.views.generic import DetailView, ListView
 from .models import (
     Asset,
     CompositeIndicator,
-    CompositeIndicatorValue,
-    Metric,
-    MetricHistory,
+    MetricSnapshot,
     WatchlistEntry,
 )
 
@@ -29,32 +27,40 @@ class CompositeIndicatorDetailView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        latest_history = MetricHistory.objects.filter(metric=OuterRef("pk")).order_by(
-            "-timestamp"
-        )
-        metrics = (
-            Metric.objects.filter(composite=self.object, is_active=True)
-            .annotate(
-                latest_value=Subquery(latest_history.values("value")[:1]),
-                latest_timestamp=Subquery(latest_history.values("timestamp")[:1]),
-            )
-            .order_by("name")
-        )
-        recent_history = (
-            MetricHistory.objects.filter(metric__composite=self.object)
-            .select_related("metric")
-            .order_by("-timestamp")[:50]
+
+        metric_fields = MetricSnapshot.METRIC_FIELDS
+        metric_labels = [MetricSnapshot.METRIC_LABELS[field]
+                         for field in metric_fields]
+
+        latest_snapshot = MetricSnapshot.objects.filter(
+            asset=OuterRef("pk")
+        ).order_by("-timestamp")
+        assets = Asset.objects.filter(is_active=True).order_by("symbol").annotate(
+            latest_snapshot_id=Subquery(latest_snapshot.values("pk")[:1])
         )
 
-        latest_indicator_values = (
-            CompositeIndicatorValue.objects.filter(composite=self.object)
-            .select_related("asset")
-            .order_by("-timestamp")[:50]
-        )
+        snapshot_ids = [
+            asset.latest_snapshot_id for asset in assets if asset.latest_snapshot_id
+        ]
+        snapshots_by_id = {
+            snapshot.id: snapshot
+            for snapshot in MetricSnapshot.objects.filter(id__in=snapshot_ids)
+        }
 
-        context["metrics"] = metrics
-        context["recent_history"] = recent_history
-        context["latest_indicator_values"] = latest_indicator_values
+        rows = []
+        for asset in assets:
+            snapshot = snapshots_by_id.get(asset.latest_snapshot_id)
+            rows.append({
+                "asset": asset,
+                "metric_values": [
+                    getattr(snapshot, field) if snapshot else None
+                    for field in metric_fields
+                ],
+                "indicator_value": snapshot.shin_indicator if snapshot else None,
+            })
+
+        context["metric_labels"] = metric_labels
+        context["rows"] = rows
         return context
 
 
@@ -65,7 +71,91 @@ class AssetListView(LoginRequiredMixin, ListView):
     login_url = reverse_lazy("login")
 
     def get_queryset(self):
-        return Asset.objects.filter(is_active=True).order_by("symbol")
+        latest_snapshot = MetricSnapshot.objects.filter(
+            asset=OuterRef("pk")
+        ).order_by("-timestamp")
+        return (
+            Asset.objects.filter(is_active=True)
+            .annotate(latest_snapshot_id=Subquery(latest_snapshot.values("pk")[:1]))
+            .order_by("symbol")
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        assets = context["assets"]
+        snapshot_ids = [
+            a.latest_snapshot_id for a in assets if a.latest_snapshot_id]
+        snapshots_by_id = {
+            s.id: s for s in MetricSnapshot.objects.filter(id__in=snapshot_ids)
+        }
+
+        watched_asset_ids = set()
+        if self.request.user.is_authenticated:
+            watched_asset_ids = set(
+                WatchlistEntry.objects.filter(user=self.request.user).values_list(
+                    "asset_id", flat=True
+                )
+            )
+
+        asset_rows = []
+        for asset in assets:
+            snapshot = snapshots_by_id.get(asset.latest_snapshot_id)
+            asset_rows.append({
+                "asset": asset,
+                "snapshot": snapshot,
+                "shin_indicator": snapshot.shin_indicator if snapshot else None,
+                "is_watched": asset.id in watched_asset_ids,
+            })
+
+        context["asset_rows"] = asset_rows
+        context["first_indicator"] = CompositeIndicator.objects.first()
+        return context
+
+
+class AssetDetailView(DetailView):
+    model = Asset
+    template_name = "indicators/asset_detail.html"
+    context_object_name = "asset"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        asset = self.object
+
+        snapshots = asset.metric_snapshots.order_by("-timestamp")
+        latest_snapshot = snapshots.first()
+        history = list(snapshots[:50])
+
+        is_watched = False
+        watchlist_entry = None
+        if self.request.user.is_authenticated:
+            watchlist_entry = WatchlistEntry.objects.filter(
+                user=self.request.user, asset=asset
+            ).first()
+            is_watched = watchlist_entry is not None
+
+        metric_fields = MetricSnapshot.METRIC_FIELDS
+        metric_labels = MetricSnapshot.METRIC_LABELS
+
+        latest_metrics = []
+        if latest_snapshot:
+            for field in metric_fields:
+                val = getattr(latest_snapshot, field)
+                if val is not None:
+                    latest_metrics.append({
+                        "field": field,
+                        "label": metric_labels.get(field, field),
+                        "value": val,
+                    })
+
+        context["latest_snapshot"] = latest_snapshot
+        context["latest_metrics"] = latest_metrics
+        context["history"] = history
+        context["metric_fields"] = metric_fields
+        context["metric_labels"] = metric_labels
+        context["is_watched"] = is_watched
+        context["watchlist_entry"] = watchlist_entry
+        context["first_indicator"] = CompositeIndicator.objects.first()
+        return context
 
 
 class WatchlistListView(LoginRequiredMixin, ListView):
