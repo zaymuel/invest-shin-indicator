@@ -114,36 +114,36 @@ class MetricSnapshot(models.Model):
         max_length=255, blank=True, verbose_name="source")
 
     p_l = models.DecimalField(
-        max_digits=20, decimal_places=3, null=True, blank=True, verbose_name="P/L")
+        max_digits=10, decimal_places=3, null=True, blank=True, verbose_name="P/L")
     p_vp = models.DecimalField(
-        max_digits=20, decimal_places=3, null=True, blank=True, verbose_name="P/VP")
+        max_digits=10, decimal_places=3, null=True, blank=True, verbose_name="P/VP")
     dy = models.DecimalField(
-        max_digits=20, decimal_places=3, null=True, blank=True, verbose_name="DY (%)")
+        max_digits=10, decimal_places=3, null=True, blank=True, verbose_name="DY (%)")
     margem_liquida = models.DecimalField(
-        max_digits=20, decimal_places=3, null=True, blank=True,
+        max_digits=10, decimal_places=3, null=True, blank=True,
         verbose_name="Margem Líquida (%)")
     receitas_cagr3 = models.DecimalField(
-        max_digits=20, decimal_places=3, null=True, blank=True,
+        max_digits=10, decimal_places=3, null=True, blank=True,
         verbose_name="CAGR Receitas 3a (%)")
     receitas_cagr5 = models.DecimalField(
-        max_digits=20, decimal_places=3, null=True, blank=True,
+        max_digits=10, decimal_places=3, null=True, blank=True,
         verbose_name="CAGR Receitas 5a (%)")
     lucros_cagr3 = models.DecimalField(
-        max_digits=20, decimal_places=3, null=True, blank=True,
+        max_digits=10, decimal_places=3, null=True, blank=True,
         verbose_name="CAGR Lucros 3a (%)")
     lucros_cagr5 = models.DecimalField(
-        max_digits=20, decimal_places=3, null=True, blank=True,
+        max_digits=10, decimal_places=3, null=True, blank=True,
         verbose_name="CAGR Lucros 5a (%)")
     ffo_cagr3 = models.DecimalField(
-        max_digits=20, decimal_places=3, null=True, blank=True,
+        max_digits=10, decimal_places=3, null=True, blank=True,
         verbose_name="CAGR FFO 3a (%)")
     ffo_cagr5 = models.DecimalField(
-        max_digits=20, decimal_places=3, null=True, blank=True,
+        max_digits=10, decimal_places=3, null=True, blank=True,
         verbose_name="CAGR FFO 5a (%)")
 
     # Derived: which formula applies depends on the asset's type (not yet implemented; SHIN v1 is used for all types today).
     shin_indicator = models.DecimalField(
-        max_digits=20, decimal_places=6, null=True, blank=True,
+        max_digits=15, decimal_places=6, null=True, blank=True,
         verbose_name="SHIN Indicator")
 
     class Meta:
