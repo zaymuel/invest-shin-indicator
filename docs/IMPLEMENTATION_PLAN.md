@@ -67,7 +67,7 @@ reits:
 ### Phase 2: Domain Data Modeling (Indicators & Metrics)
 
 - Create models for the main `CompositeIndicator`.
-- Create a `MetricSnapshot` model to store all scraped records (Float/Decimal values) for an asset in a single wide row, accompanied by a `timestamp = models.DateTimeField(default=timezone.now)`.
+- Create a `MetricSnapshot` model to store all metrics captured for an asset in a single wide row per date, accompanied by a precise `timestamp = models.DateTimeField(default=timezone.now)`.
 - Establish the `Watchlist` model linking the `CustomUser` to their preferred assets or indicators.
 - Register all new models in the Django Admin for admin-only management.
 
