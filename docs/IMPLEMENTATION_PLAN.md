@@ -76,7 +76,7 @@ reits:
 - Create a dedicated `scraper` module.
 - Set up a headless Selenium WebDriver script capable of visiting the target data sources.
 - Implement robust exception handling, implicit/explicit wait structures, and user-agent spoofing if necessary.
-- Build logic to parse the DOM, extract the metric values, and use Django's ORM to securely create new `MetricSnapshot` rows.
+- Build logic to parse the DOM, extract the metric values, and use Django's ORM to update or create the `MetricSnapshot` row for each `(asset, date)`.
 
 ### Phase 4: Business Logic & Django Views
 
