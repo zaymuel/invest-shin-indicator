@@ -171,21 +171,14 @@ To register the SHIN indicator formula in the project:
 }
 ```
 
-4. Create the derived `Metric` that belongs to the same `CompositeIndicator` and asset you are evaluating:
-   - name: `SHIN Indicator`
-   - key: `shin_indicator`
-   - kind: `derived`
-   - asset: the target asset (example: WEGE3)
-   - composite: the `SHIN Indicator` composite definition
-
-5. How to compute:
-   - `compute_derived_metrics(asset=some_asset, persist=False)` computes the score in memory for views.
-   - `compute_derived_metrics(asset=some_asset, persist=True)` writes the result into `MetricHistory` as a calculated value.
+4. How to compute:
+   - `compute_shin_indicator(asset=some_asset, persist=False)` computes the score in memory for views.
+   - `compute_shin_indicator(asset=some_asset, persist=True)` updates `shin_indicator` on the asset's latest existing `MetricSnapshot`; if no snapshot exists, it returns `None` without creating one.
 
 ```python
-from indicators.services.calculations import compute_derived_metrics
+from indicators.services.calculations import compute_shin_indicator
 
-compute_derived_metrics(asset=some_asset, persist=True)
+compute_shin_indicator(asset=some_asset, persist=True)
 ```
 
 Notes
