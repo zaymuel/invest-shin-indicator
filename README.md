@@ -173,7 +173,7 @@ To register the SHIN indicator formula in the project:
 
 4. How to compute:
    - `compute_shin_indicator(asset=some_asset, persist=False)` computes the score in memory for views.
-   - `compute_shin_indicator(asset=some_asset, persist=True)` writes the result into `MetricSnapshot` as a calculated value.
+   - `compute_shin_indicator(asset=some_asset, persist=True)` updates `shin_indicator` on the asset's latest existing `MetricSnapshot`; if no snapshot exists, it returns `None` without creating one.
 
 ```python
 from indicators.services.calculations import compute_shin_indicator
