@@ -68,12 +68,69 @@ python manage.py runserver
 Access the application at `http://127.0.0.1:8000/` and the admin panel at `http://127.0.0.1:8000/admin/`.
 
 ## Running the Scraper
-The web scraper is decoupled from the main web views and runs via a Django management command. 
-To initiate a scraping task and update the database with fresh metrics, run:
+The web scraper is decoupled from the main web views and runs via a Django management command.
+
+1. Define scraping sources per asset type in your settings (local settings example):
+```python
+SCRAPER_SOURCES = {
+    "stock": {
+        "source_type": "yahoo",
+        "url_template": "https://finance.yahoo.com/quote/{symbol}",
+        "metrics": {
+            "p_l": "trailingPE",
+            "p_vp": "priceToBook",
+            "dy": "dividendYield",
+            "margem_liquida": "profitMargins",
+        },
+    },
+    "reit": {
+        "source_type": "yahoo",
+        "url_template": "https://finance.yahoo.com/quote/{symbol}",
+        "metrics": {
+            "p_l": "trailingPE",
+            "p_vp": "priceToBook",
+            "dy": "dividendYield",
+            "margem_liquida": "profitMargins",
+        },
+    },
+    "acao": {
+        "source_type": "statusinvest",
+        "url_template": "https://statusinvest.com.br/acoes/{symbol}",
+        "metrics": {
+            "p_l": "p_l",
+            "p_vp": "p_vp",
+            "dy": "dy",
+            "margem_liquida": "margemliquida",
+            "receitas_cagr5": "receitas_cagr5",
+            "lucros_cagr5": "lucros_cagr5",
+        },
+    },
+    "fii": {
+        "source_type": "statusinvest",
+        "url_template": "https://statusinvest.com.br/fundos-imobiliarios/{symbol}",
+        "metrics": {
+            "p_l": "p_l",
+            "p_vp": "p_vp",
+            "dy": "dy",
+            "margem_liquida": "margemliquida",
+            "receitas_cagr5": "receitas_cagr5",
+            "lucros_cagr5": "lucros_cagr5",
+        },
+    },
+}
+```
+
+Each key must match one of `Asset.ASSET_TYPE_CHOICES` (`stock`, `reit`, `acao`, `fii`). The scraper visits `url_template` once per active asset of that type (with `{symbol}` filled in from `Asset.symbol`) and extracts every metric listed in `metrics` from that single page load.
+
+`source_type` supports:
+- `selector` / `css` for regular DOM selectors (the `metrics` values are CSS selectors)
+- `statusinvest` / `yahoo` / `json` for embedded JSON/data-attribute extraction (the `metrics` values are the remote JSON/data keys)
+
+
+2. Run the scraper:
 ```bash
 python manage.py run_scraper
 ```
-*(Note: This command will be fully available once Phase 4 of project implementation is complete.)*
 
 ## Security & Open Source Warning
 - **DO NOT commit sensitive information** (Secret Keys, Database Passwords, API Keys, etc.) to this repository.
@@ -82,3 +139,56 @@ python manage.py run_scraper
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+### How to configure your exact formula
+
+The formula metadata now lives directly on the `CompositeIndicator`, not in a separate `MetricFormula` model.
+
+To register the SHIN indicator formula in the project:
+
+1. Create or edit a `CompositeIndicator` record:
+   - name: `SHIN Indicator`
+   - formula_code: `shin_v1`
+   - expression: store the literal formula for documentation and auditing
+   - operands: map the formula inputs to actual metric keys
+
+2. Example formula definition:
+
+```text
+=LOG10(MAX(0.001, (1+([@[DY (%)]]/4)) * MAX(0.01, [@[Marg líq (%)]]) * MAX(0.01, [@[CAGR receitas]]) * MAX(0.01, [@[CAGR lucros]]) / (IF([@[P/L]]<=0, 1000, [@[P/L]]) * IF([@[P/VP]]<=0, 1000, [@[P/VP]]))))
+```
+
+3. Example operands JSON:
+
+```json
+{
+  "dy_key": "dy",
+  "margem_liquida_key": "margem_liquida",
+  "receitas_cagr_key": "receitas_cagr5",
+  "lucros_cagr_key": "lucros_cagr5",
+  "p_l_key": "p_l",
+  "p_vp_key": "p_vp"
+}
+```
+
+4. Create the derived `Metric` that belongs to the same `CompositeIndicator` and asset you are evaluating:
+   - name: `SHIN Indicator`
+   - key: `shin_indicator`
+   - kind: `derived`
+   - asset: the target asset (example: WEGE3)
+   - composite: the `SHIN Indicator` composite definition
+
+5. How to compute:
+   - `compute_derived_metrics(asset=some_asset, persist=False)` computes the score in memory for views.
+   - `compute_derived_metrics(asset=some_asset, persist=True)` writes the result into `MetricHistory` as a calculated value.
+
+```python
+from indicators.services.calculations import compute_derived_metrics
+
+compute_derived_metrics(asset=some_asset, persist=True)
+```
+
+Notes
+- The formula logic is stored on the `CompositeIndicator`, keeping the model simpler and aligned with the fact that the formula defines the indicator itself.
+- If you change metric keys referenced in `operands`, update the JSON mapping accordingly.
+
