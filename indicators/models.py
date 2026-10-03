@@ -266,3 +266,29 @@ class WatchlistEntry(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user} - {self.asset}"
+class YearlyAssetPerformance(models.Model):
+    asset = models.ForeignKey(
+        Asset,
+        related_name="yearly_performances",
+        on_delete=models.CASCADE,
+        verbose_name="asset",
+    )
+    year = models.IntegerField(verbose_name="year")
+    high = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="high"
+    )
+    low = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="low"
+    )
+    eps = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="EPS"
+    )
+
+    class Meta:
+        verbose_name = "Yearly asset performance"
+        verbose_name_plural = "Yearly asset performances"
+        unique_together = ("asset", "year")
+        ordering = ["-year"]
+
+    def __str__(self) -> str:
+        return f"{self.asset.symbol} ({self.year})"

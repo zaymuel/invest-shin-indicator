@@ -1,41 +1,45 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
+{% load static %}
 
-{% block title %}{{ asset.symbol }} — Metrics &amp; Indicator | Invest Shin{% endblock %}
+{% block title %}{{ asset.symbol }} - {{ asset.name|default:"Asset Details" }} | Shin Indicator{% endblock %}
+
+{% block extra_head %}
+<!-- Chart.js for rendering graphs -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
 
 {% block content %}
-  <nav aria-label="breadcrumb" class="mb-3">
-    <ol class="breadcrumb">
-      <li class="breadcrumb-item"><a href="{% url 'home' %}">Home</a></li>
-      <li class="breadcrumb-item"><a href="{% url 'asset-list' %}">Assets</a></li>
-      <li class="breadcrumb-item active" aria-current="page">{{ asset.symbol }}</li>
-    </ol>
-  </nav>
+  <div class="row align-items-center mb-4">
+    <div class="col-12 col-md-8">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-2">
+          <li class="breadcrumb-item"><a href="{% url 'home' %}" class="text-decoration-none">Home</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'asset-list' %}" class="text-decoration-none">Assets</a></li>
+          <li class="breadcrumb-item active" aria-current="page">{{ asset.symbol }}</li>
+        </ol>
+      </nav>
+      <h2 class="mb-0 fw-bold d-flex align-items-center gap-2">
+        {{ asset.symbol }}
+        {% if asset.name %}
+          <span class="fs-5 text-muted fw-normal ms-2 border-start ps-3">{{ asset.name }}</span>
+        {% endif %}
+        <span class="badge bg-secondary ms-2 fs-6 fw-normal">{{ asset.get_asset_type_display }}</span>
+        {% if not asset.is_active %}
+          <span class="badge bg-danger ms-1 fs-6 fw-normal">Inactive</span>
+        {% endif %}
+      </h2>
+    </div>
 
-  <!-- Asset Header -->
-  <div class="card mb-4 shadow-sm border-secondary-subtle">
-    <div class="card-body p-4">
-      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
-        <div>
-          <div class="d-flex align-items-center gap-2 mb-1">
-            <h1 class="display-6 fw-bold mb-0">{{ asset.symbol }}</h1>
-            <span class="badge bg-primary fs-6">{{ asset.get_asset_type_display }}</span>
-            {% if asset.is_active %}
-              <span class="badge bg-success-subtle text-success-emphasis">Active</span>
-            {% else %}
-              <span class="badge bg-secondary">Inactive</span>
-            {% endif %}
-          </div>
-          <p class="text-muted fs-5 mb-0">{{ asset.name|default:"Name not specified" }}</p>
-        </div>
-
-        <div class="d-flex flex-wrap align-items-center gap-2">
-          {% if user.is_authenticated %}
+    <div class="col-12 col-md-4 mt-3 mt-md-0">
+      <div class="d-flex justify-content-md-end">
+        <div class="btn-group shadow-sm">
+          {% if request.user.is_authenticated %}
             {% if is_watched %}
-              <form method="post" action="{% url 'watchlist-remove' watchlist_entry.pk %}">
+              <form method="post" action="{% url 'watchlist-remove' watchlist_entry.pk %}" class="d-inline">
                 {% csrf_token %}
                 <input type="hidden" name="next" value="{% url 'asset-detail' asset.pk %}">
                 <button type="submit" class="btn btn-warning">
-                  <i class="bi bi-star-fill me-1"></i>Watching (Click to Remove)
+                  <i class="bi bi-star-fill me-1"></i>Watched
                 </button>
               </form>
             {% else %}
@@ -155,6 +159,94 @@
       </div>
     </div>
   </div>
+
+  <!-- Earnings Graph -->
+  {% if yearly_performance_labels %}
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-dark-subtle d-flex justify-content-between align-items-center py-3">
+      <h5 class="mb-0 fw-semibold">
+        <i class="bi bi-graph-up me-2"></i>Yearly Performance (EPS vs Quotes)
+      </h5>
+    </div>
+    <div class="card-body">
+      <canvas id="earningsChart" height="100"></canvas>
+      <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const ctx = document.getElementById('earningsChart').getContext('2d');
+
+            const labels = {{ yearly_performance_labels|safe }};
+            const epsData = {{ yearly_performance_eps|safe }};
+            const highData = {{ yearly_performance_high|safe }};
+            const lowData = {{ yearly_performance_low|safe }};
+
+            const chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'EPS (Earnings Per Share)',
+                            type: 'bar',
+                            data: epsData,
+                            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Yearly High / Low',
+                            type: 'bar',
+                            data: highData.map((high, index) => {
+                                const low = lowData[index];
+                                if (high !== null && low !== null) {
+                                    return [low, high]; // Float bar for candlestick approximation
+                                }
+                                return null;
+                            }),
+                            backgroundColor: 'rgba(255, 159, 64, 0.5)',
+                            borderColor: 'rgba(255, 159, 64, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y1',
+                            barPercentage: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'EPS'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Price'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                        },
+                    }
+                }
+            });
+        });
+      </script>
+    </div>
+  </div>
+  {% endif %}
 
   <!-- Latest Snapshot All Metrics Table -->
   <div class="card mb-4 shadow-sm">

@@ -11,7 +11,9 @@ from .models import (
     CompositeIndicator,
     MetricSnapshot,
     WatchlistEntry,
+    YearlyAssetPerformance,
 )
+import json
 
 
 class HomeView(TemplateView):
@@ -214,6 +216,12 @@ class AssetDetailView(DetailView):
                         "value": val,
                     })
 
+        yearly_perf = YearlyAssetPerformance.objects.filter(asset=asset).order_by("year")
+        yearly_performance_labels = [p.year for p in yearly_perf]
+        yearly_performance_eps = [float(p.eps) if p.eps is not None else None for p in yearly_perf]
+        yearly_performance_high = [float(p.high) if p.high is not None else None for p in yearly_perf]
+        yearly_performance_low = [float(p.low) if p.low is not None else None for p in yearly_perf]
+
         context["latest_snapshot"] = latest_snapshot
         context["latest_metrics"] = latest_metrics
         context["history"] = history
@@ -222,6 +230,12 @@ class AssetDetailView(DetailView):
         context["is_watched"] = is_watched
         context["watchlist_entry"] = watchlist_entry
         context["first_indicator"] = CompositeIndicator.objects.first()
+
+        context["yearly_performance_labels"] = json.dumps(yearly_performance_labels)
+        context["yearly_performance_eps"] = json.dumps(yearly_performance_eps)
+        context["yearly_performance_high"] = json.dumps(yearly_performance_high)
+        context["yearly_performance_low"] = json.dumps(yearly_performance_low)
+
         return context
 
 

@@ -129,3 +129,28 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+SCRAPER_SOURCES = {
+    "stock": {
+        "source_type": "yahoo",
+        "url_template": "https://finance.yahoo.com/quote/{symbol}",
+    },
+    "reit": {
+        "source_type": "yahoo",
+        "url_template": "https://finance.yahoo.com/quote/{symbol}",
+    },
+    "acao": {
+        "source_type": "statusinvest",
+        "url_template": "https://statusinvest.com.br/acoes/{symbol}",
+    },
+    "fii": {
+        "source_type": "statusinvest",
+        "url_template": "https://statusinvest.com.br/fundos-imobiliarios/{symbol}",
+    },
+    "usa_stock_alphavantage": {
+        "source_type": "alphavantage",
+        "overview_url": "https://www.alphavantage.co/query?function=OVERVIEW&symbol={symbol}&apikey={api_key}",
+        "earnings_url": "https://www.alphavantage.co/query?function=EARNINGS&symbol={symbol}&apikey={api_key}",
+    }
+}
+ALPHAVANTAGE_API_KEY = "demo"
