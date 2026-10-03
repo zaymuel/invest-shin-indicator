@@ -105,7 +105,7 @@ Recommended extraction method:
      - `price_to_book`
      - `dividend_yield`
 
-4. Save to the time-series model (`MetricHistory`) with timestamp and source metadata.
+4. Save to the time-series model (`MetricSnapshot`) with timestamp and source metadata.
 
 ## Conclusion
 

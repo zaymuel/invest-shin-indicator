@@ -66,8 +66,8 @@ reits:
 
 ### Phase 2: Domain Data Modeling (Indicators & Metrics)
 
-- Create models for the main `CompositeIndicator` and `Metric`.
-- Create a `MetricHistory` (or similarly named) model directly attached to the `Metric` to store individual scrape records (Float/Decimal values) accompanied by a `timestamp = models.DateTimeField(auto_now_add=True)`.
+- Create models for the main `CompositeIndicator`.
+- Create a `MetricSnapshot` model to store all scraped records (Float/Decimal values) for an asset in a single wide row, accompanied by a `timestamp = models.DateTimeField(default=timezone.now)`.
 - Establish the `Watchlist` model linking the `CustomUser` to their preferred assets or indicators.
 - Register all new models in the Django Admin for admin-only management.
 
@@ -76,7 +76,7 @@ reits:
 - Create a dedicated `scraper` module.
 - Set up a headless Selenium WebDriver script capable of visiting the target data sources.
 - Implement robust exception handling, implicit/explicit wait structures, and user-agent spoofing if necessary.
-- Build logic to parse the DOM, extract the metric values, and use Django's ORM to securely create new `MetricHistory` rows.
+- Build logic to parse the DOM, extract the metric values, and use Django's ORM to securely create new `MetricSnapshot` rows.
 
 ### Phase 4: Business Logic & Django Views
 
