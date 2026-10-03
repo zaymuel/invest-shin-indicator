@@ -24,8 +24,7 @@ class HomeView(TemplateView):
         context["first_indicator"] = first_indicator
 
         if not user.is_authenticated:
-            context["total_assets_count"] = Asset.objects.filter(
-                is_active=True).count()
+            context["total_assets_count"] = Asset.objects.filter(is_active=True).count()
             return context
 
         entries = (
@@ -35,21 +34,19 @@ class HomeView(TemplateView):
         )
 
         watched_asset_ids = [entry.asset_id for entry in entries]
-        latest_snapshot = MetricSnapshot.objects.filter(
-            asset=OuterRef("pk")
-        ).order_by("-timestamp")
-
-        assets_with_snapshots = (
-            Asset.objects.filter(id__in=watched_asset_ids, is_active=True)
-            .annotate(latest_snapshot_id=Subquery(latest_snapshot.values("pk")[:1]))
+        latest_snapshot = MetricSnapshot.objects.filter(asset=OuterRef("pk")).order_by(
+            "-timestamp"
         )
+
+        assets_with_snapshots = Asset.objects.filter(
+            id__in=watched_asset_ids, is_active=True
+        ).annotate(latest_snapshot_id=Subquery(latest_snapshot.values("pk")[:1]))
 
         snapshot_ids = [
             a.latest_snapshot_id for a in assets_with_snapshots if a.latest_snapshot_id
         ]
         snapshots_by_id = {
-            s.id: s
-            for s in MetricSnapshot.objects.filter(id__in=snapshot_ids)
+            s.id: s for s in MetricSnapshot.objects.filter(id__in=snapshot_ids)
         }
 
         entry_map = {entry.asset_id: entry.id for entry in entries}
@@ -63,19 +60,25 @@ class HomeView(TemplateView):
                 "shin_indicator": snapshot.shin_indicator if snapshot else None,
             }
 
+        items_by_type = {}
+        for item in asset_info.values():
+            asset_type = item["asset"].asset_type
+            if asset_type not in items_by_type:
+                items_by_type[asset_type] = []
+            items_by_type[asset_type].append(item)
+
         grouped_assets = []
         for type_code, type_label in Asset.ASSET_TYPE_CHOICES:
-            type_items = [
-                item for item in asset_info.values()
-                if item["asset"].asset_type == type_code
-            ]
+            type_items = items_by_type.get(type_code, [])
             if type_items:
-                grouped_assets.append({
-                    "type_code": type_code,
-                    "type_label": type_label,
-                    "items": type_items,
-                    "count": len(type_items),
-                })
+                grouped_assets.append(
+                    {
+                        "type_code": type_code,
+                        "type_label": type_label,
+                        "items": type_items,
+                        "count": len(type_items),
+                    }
+                )
 
         context["grouped_assets"] = grouped_assets
         context["total_watched"] = len(asset_info)
@@ -97,14 +100,15 @@ class CompositeIndicatorDetailView(DetailView):
         context = super().get_context_data(**kwargs)
 
         metric_fields = MetricSnapshot.METRIC_FIELDS
-        metric_labels = [MetricSnapshot.METRIC_LABELS[field]
-                         for field in metric_fields]
+        metric_labels = [MetricSnapshot.METRIC_LABELS[field] for field in metric_fields]
 
-        latest_snapshot = MetricSnapshot.objects.filter(
-            asset=OuterRef("pk")
-        ).order_by("-timestamp")
-        assets = Asset.objects.filter(is_active=True).order_by("symbol").annotate(
-            latest_snapshot_id=Subquery(latest_snapshot.values("pk")[:1])
+        latest_snapshot = MetricSnapshot.objects.filter(asset=OuterRef("pk")).order_by(
+            "-timestamp"
+        )
+        assets = (
+            Asset.objects.filter(is_active=True)
+            .order_by("symbol")
+            .annotate(latest_snapshot_id=Subquery(latest_snapshot.values("pk")[:1]))
         )
 
         snapshot_ids = [
@@ -118,14 +122,16 @@ class CompositeIndicatorDetailView(DetailView):
         rows = []
         for asset in assets:
             snapshot = snapshots_by_id.get(asset.latest_snapshot_id)
-            rows.append({
-                "asset": asset,
-                "metric_values": [
-                    getattr(snapshot, field) if snapshot else None
-                    for field in metric_fields
-                ],
-                "indicator_value": snapshot.shin_indicator if snapshot else None,
-            })
+            rows.append(
+                {
+                    "asset": asset,
+                    "metric_values": [
+                        getattr(snapshot, field) if snapshot else None
+                        for field in metric_fields
+                    ],
+                    "indicator_value": snapshot.shin_indicator if snapshot else None,
+                }
+            )
 
         context["metric_labels"] = metric_labels
         context["rows"] = rows
@@ -138,9 +144,9 @@ class AssetListView(ListView):
     context_object_name = "assets"
 
     def get_queryset(self):
-        latest_snapshot = MetricSnapshot.objects.filter(
-            asset=OuterRef("pk")
-        ).order_by("-timestamp")
+        latest_snapshot = MetricSnapshot.objects.filter(asset=OuterRef("pk")).order_by(
+            "-timestamp"
+        )
         return (
             Asset.objects.filter(is_active=True)
             .annotate(latest_snapshot_id=Subquery(latest_snapshot.values("pk")[:1]))
@@ -150,8 +156,7 @@ class AssetListView(ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         assets = context["assets"]
-        snapshot_ids = [
-            a.latest_snapshot_id for a in assets if a.latest_snapshot_id]
+        snapshot_ids = [a.latest_snapshot_id for a in assets if a.latest_snapshot_id]
         snapshots_by_id = {
             s.id: s for s in MetricSnapshot.objects.filter(id__in=snapshot_ids)
         }
@@ -167,12 +172,14 @@ class AssetListView(ListView):
         asset_rows = []
         for asset in assets:
             snapshot = snapshots_by_id.get(asset.latest_snapshot_id)
-            asset_rows.append({
-                "asset": asset,
-                "snapshot": snapshot,
-                "shin_indicator": snapshot.shin_indicator if snapshot else None,
-                "is_watched": asset.id in watched_asset_ids,
-            })
+            asset_rows.append(
+                {
+                    "asset": asset,
+                    "snapshot": snapshot,
+                    "shin_indicator": snapshot.shin_indicator if snapshot else None,
+                    "is_watched": asset.id in watched_asset_ids,
+                }
+            )
 
         context["asset_rows"] = asset_rows
         context["first_indicator"] = CompositeIndicator.objects.first()
@@ -208,11 +215,13 @@ class AssetDetailView(DetailView):
             for field in metric_fields:
                 val = getattr(latest_snapshot, field)
                 if val is not None:
-                    latest_metrics.append({
-                        "field": field,
-                        "label": metric_labels.get(field, field),
-                        "value": val,
-                    })
+                    latest_metrics.append(
+                        {
+                            "field": field,
+                            "label": metric_labels.get(field, field),
+                            "value": val,
+                        }
+                    )
 
         context["latest_snapshot"] = latest_snapshot
         context["latest_metrics"] = latest_metrics
@@ -249,14 +258,15 @@ class WatchlistAddView(LoginRequiredMixin, View):
             user=request.user, asset=asset
         )
         if created:
-            messages.success(
-                request, f"{asset.symbol} added to your watchlist.")
+            messages.success(request, f"{asset.symbol} added to your watchlist.")
         else:
-            messages.info(
-                request, f"{asset.symbol} is already in your watchlist.")
+            messages.info(request, f"{asset.symbol} is already in your watchlist.")
 
-        next_url = request.POST.get("next") or request.META.get(
-            "HTTP_REFERER") or reverse_lazy("home")
+        next_url = (
+            request.POST.get("next")
+            or request.META.get("HTTP_REFERER")
+            or reverse_lazy("home")
+        )
         return redirect(next_url)
 
 
@@ -265,11 +275,15 @@ class WatchlistRemoveView(LoginRequiredMixin, View):
 
     def post(self, request, *args, **kwargs):
         entry = get_object_or_404(
-            WatchlistEntry, id=kwargs.get("pk"), user=request.user)
+            WatchlistEntry, id=kwargs.get("pk"), user=request.user
+        )
         asset_symbol = entry.asset.symbol
         entry.delete()
         messages.info(request, f"{asset_symbol} removed from your watchlist.")
 
-        next_url = request.POST.get("next") or request.META.get(
-            "HTTP_REFERER") or reverse_lazy("home")
+        next_url = (
+            request.POST.get("next")
+            or request.META.get("HTTP_REFERER")
+            or reverse_lazy("home")
+        )
         return redirect(next_url)
