@@ -25,7 +25,7 @@ def _get_operand(formula, latest_values: dict, operand_name: str, default_key: s
     return safe_decimal(latest_values.get(operand_key))
 
 
-def _evaluate_shin_acao(formula: CompositeIndicator, latest_values: dict):
+def _evaluate_shin_acao(formula: CompositeIndicator, latest_values: dict, asset_type: str = None):
     """
     Evaluates for Ações / Stocks / REITs:
     =LOG10(
@@ -60,24 +60,32 @@ def _evaluate_shin_acao(formula: CompositeIndicator, latest_values: dict):
         formula, latest_values, "lucros_cagr_key", "lucros_cagr5"
     )
 
-    # Fallback to FFO CAGR for REITs
     ffo_cagr3 = safe_decimal(latest_values.get("ffo_cagr3"))
     ffo_cagr5 = safe_decimal(latest_values.get("ffo_cagr5"))
 
     p_l = _get_operand(formula, latest_values, "p_l_key", "p_l")
     p_vp = _get_operand(formula, latest_values, "p_vp_key", "p_vp")
 
+    if asset_type == "reit":
+        rec3 = ffo_cagr3 if ffo_cagr3 is not None else receitas_cagr3
+        rec5 = ffo_cagr5 if ffo_cagr5 is not None else receitas_cagr5
+        luc3 = ffo_cagr3 if ffo_cagr3 is not None else lucros_cagr3
+        luc5 = ffo_cagr5 if ffo_cagr5 is not None else lucros_cagr5
+    else:
+        rec3 = receitas_cagr3
+        rec5 = receitas_cagr5
+        luc3 = lucros_cagr3
+        luc5 = lucros_cagr5
+
     present = [
         v
         for v in (
             dy,
             margem_liquida,
-            receitas_cagr3,
-            receitas_cagr5,
-            lucros_cagr3,
-            lucros_cagr5,
-            ffo_cagr3,
-            ffo_cagr5,
+            rec3,
+            rec5,
+            luc3,
+            luc5,
             p_l,
             p_vp,
         )
@@ -94,12 +102,6 @@ def _evaluate_shin_acao(formula: CompositeIndicator, latest_values: dict):
         if margem_liquida is not None
         else Decimal("1")
     )
-
-    # TODO: review the logic for using FFO CAGR as a fallback for REITs. It might be better to handle this in a more explicit way, rather than relying on the presence of FFO values.
-    rec3 = receitas_cagr3 if receitas_cagr3 is not None else ffo_cagr3
-    rec5 = receitas_cagr5 if receitas_cagr5 is not None else ffo_cagr5
-    luc3 = lucros_cagr3 if lucros_cagr3 is not None else ffo_cagr3
-    luc5 = lucros_cagr5 if lucros_cagr5 is not None else ffo_cagr5
 
     rec3_factor = max(
         Decimal("0.01"), rec3) if rec3 is not None else Decimal("1")
@@ -212,7 +214,7 @@ def evaluate_formula(formula: CompositeIndicator, latest_values: dict, asset_typ
     if formula.formula_code == CompositeIndicator.FORMULA_SHIN_V1:
         if asset_type == "fii":
             return _evaluate_shin_fii(formula, latest_values)
-        return _evaluate_shin_acao(formula, latest_values)
+        return _evaluate_shin_acao(formula, latest_values, asset_type)
     return None
 
 
